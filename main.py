@@ -1,12 +1,17 @@
-import numpy as np
 import argparse
-from tqdm import tqdm
-import os, shutil
+import os
+import shutil
+
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn as nn
+from tqdm import tqdm
+
 from data_loader import get_dataloaders
 from faceXhubert import FaceXHuBERT
+from gt_renderer import transform_gt_to_template_space
+from video_utils import create_video_from_prediction
 
 
 def plot_losses(train_losses, val_losses):
@@ -29,77 +34,131 @@ def trainer(args, train_loader, dev_loader, model, optimizer, criterion, epoch=1
 
     train_subjects_list = [i for i in args.train_subjects.split(" ")]
     iteration = 0
-    for e in range(epoch+1):
+    for e in range(epoch + 1):
         loss_log = []
         model.train()
-        pbar = tqdm(enumerate(train_loader),total=len(train_loader))
+        pbar = tqdm(enumerate(train_loader), total=len(train_loader))
         optimizer.zero_grad()
 
         for i, (audio, vertice, template, one_hot, file_name, emo_one_hot) in pbar:
             iteration += 1
             vertice = str(vertice[0])
-            vertice = np.load(vertice,allow_pickle=True)
+            vertice = np.load(vertice, allow_pickle=True)
             vertice = vertice.astype(np.float32)
+
+            # Apply transformation to match template coordinate system
+            template_vertices = template[0].cpu().numpy().reshape(-1, 3)  # Reshape to (num_vertices, 3)
+
+            # Reshape vertice data for transformation
+            num_frames, total_coords = vertice.shape
+            num_vertices = total_coords // 3
+            vertice_reshaped = vertice.reshape(num_frames, num_vertices, 3)
+
+            # Apply transformation frame by frame
+            transformed_frames = []
+            for frame_idx in range(num_frames):
+                transformed_frame = transform_gt_to_template_space(vertice_reshaped[frame_idx], template_vertices)
+                transformed_frames.append(transformed_frame)
+
+            # Reshape back to original format
+            vertice = np.array(transformed_frames).reshape(num_frames, -1)
+
             vertice = torch.from_numpy(vertice)
-            vertice = torch.unsqueeze(vertice,0)
-            audio, vertice, template, one_hot, emo_one_hot  = audio.to(device="cuda"), vertice.to(device="cuda"), template.to(device="cuda"), one_hot.to(device="cuda"), emo_one_hot.to(device="cuda")
-            loss = model(audio, template,  vertice, one_hot, emo_one_hot, criterion)
+            vertice = torch.unsqueeze(vertice, 0)
+            audio, vertice, template, one_hot, emo_one_hot = (
+                audio.to(device="cuda"),
+                vertice.to(device="cuda"),
+                template.to(device="cuda"),
+                one_hot.to(device="cuda"),
+                emo_one_hot.to(device="cuda"),
+            )
+            loss = model(audio, template, vertice, one_hot, emo_one_hot, criterion)
 
             loss.backward()
             loss_log.append(loss.item())
-            if i % args.gradient_accumulation_steps==0:
+            if i % args.gradient_accumulation_steps == 0:
                 optimizer.step()
                 optimizer.zero_grad()
                 del audio, vertice, template, one_hot, emo_one_hot
                 torch.cuda.empty_cache()
 
-            pbar.set_description("(Epoch {}, iteration {}) TRAIN LOSS:{:.8f}".format((e+1), iteration ,np.mean(loss_log)))
+            pbar.set_description(
+                "(Epoch {}, iteration {}) TRAIN LOSS:{:.8f}".format((e + 1), iteration, np.mean(loss_log))
+            )
 
         train_losses.append(np.mean(loss_log))
 
         valid_loss_log = []
         model.eval()
-        for audio, vertice, template, one_hot_all,file_name, emo_one_hot in dev_loader:
+        for audio, vertice, template, one_hot_all, file_name, emo_one_hot in dev_loader:
             # to gpu
             vertice = str(vertice[0])
-            vertice = np.load(vertice,allow_pickle=True)
+            vertice = np.load(vertice, allow_pickle=True)
             vertice = vertice.astype(np.float32)
+
+            # Apply transformation to match template coordinate system
+            template_vertices = template[0].cpu().numpy().reshape(-1, 3)  # Reshape to (num_vertices, 3)
+
+            # Reshape vertice data for transformation
+            num_frames, total_coords = vertice.shape
+            num_vertices = total_coords // 3
+            vertice_reshaped = vertice.reshape(num_frames, num_vertices, 3)
+
+            # Apply transformation frame by frame
+            transformed_frames = []
+            for frame_idx in range(num_frames):
+                transformed_frame = transform_gt_to_template_space(vertice_reshaped[frame_idx], template_vertices)
+                transformed_frames.append(transformed_frame)
+
+            # Reshape back to original format
+            vertice = np.array(transformed_frames).reshape(num_frames, -1)
+
             vertice = torch.from_numpy(vertice)
-            vertice = torch.unsqueeze(vertice,0)
-            audio, vertice, template, one_hot_all, emo_one_hot= audio.to(device="cuda"), vertice.to(device="cuda"), template.to(device="cuda"), one_hot_all.to(device="cuda"), emo_one_hot.to(device="cuda")
+            vertice = torch.unsqueeze(vertice, 0)
+            audio, vertice, template, one_hot_all, emo_one_hot = (
+                audio.to(device="cuda"),
+                vertice.to(device="cuda"),
+                template.to(device="cuda"),
+                one_hot_all.to(device="cuda"),
+                emo_one_hot.to(device="cuda"),
+            )
             train_subject = "_".join(file_name[0].split("_")[:-1])
             if train_subject in train_subjects_list:
                 condition_subject = train_subject
                 iter = train_subjects_list.index(condition_subject)
-                one_hot = one_hot_all[:,iter,:]
-                loss = model(audio, template,  vertice, one_hot, emo_one_hot, criterion)
+                one_hot = one_hot_all[:, iter, :]
+                loss = model(audio, template, vertice, one_hot, emo_one_hot, criterion)
                 valid_loss_log.append(loss.item())
             else:
                 for iter in range(one_hot_all.shape[-1]):
                     condition_subject = train_subjects_list[iter]
-                    one_hot = one_hot_all[:,iter,:]
-                    loss = model(audio, template,  vertice, one_hot, emo_one_hot, criterion)
+                    one_hot = one_hot_all[:, iter, :]
+                    loss = model(audio, template, vertice, one_hot, emo_one_hot, criterion)
                     valid_loss_log.append(loss.item())
 
         current_loss = np.mean(valid_loss_log)
 
         val_losses.append(current_loss)
-        if (e > 0 and e % 25 == 0) or e == args.max_epoch:
-            torch.save(model.state_dict(), os.path.join(save_path,'{}_model.pth'.format(e)))
+        if (e % 25 == 0) or e == args.max_epoch:
+            torch.save(model.state_dict(), os.path.join(save_path, '{}_model.pth'.format(e)))
 
-        print("epcoh: {}, current loss:{:.8f}".format(e+1,current_loss))
+        print("epcoh: {}, current loss:{:.8f}".format(e + 1, current_loss))
 
-    plot_losses(train_losses, val_losses)
+        plot_losses(train_losses, val_losses)
 
     return model
 
 
 @torch.no_grad()
-def test(args, model, test_loader,epoch):
+def test(args, model, test_loader, epoch):
     result_path = os.path.join(args.result_path)
     if os.path.exists(result_path):
         shutil.rmtree(result_path)
     os.makedirs(result_path)
+
+    # Create video output directory
+    video_output_dir = os.path.join(args.result_path, "videos")
+    os.makedirs(video_output_dir, exist_ok=True)
 
     save_path = os.path.join(args.save_path)
     train_subjects_list = [i for i in args.train_subjects.split(" ")]
@@ -110,26 +169,89 @@ def test(args, model, test_loader,epoch):
 
     for audio, vertice, template, one_hot_all, file_name, emo_one_hot in test_loader:
         vertice = str(vertice[0])
-        vertice = np.load(vertice,allow_pickle=True)
+        vertice = np.load(vertice, allow_pickle=True)
         vertice = vertice.astype(np.float32)
+
+        # Apply transformation to match template coordinate system
+        template_vertices = template[0].cpu().numpy().reshape(-1, 3)  # Reshape to (num_vertices, 3)
+
+        # Reshape vertice data for transformation
+        num_frames, total_coords = vertice.shape
+        num_vertices = total_coords // 3
+        vertice_reshaped = vertice.reshape(num_frames, num_vertices, 3)
+
+        # Apply transformation frame by frame
+        transformed_frames = []
+        for frame_idx in range(num_frames):
+            transformed_frame = transform_gt_to_template_space(vertice_reshaped[frame_idx], template_vertices)
+            transformed_frames.append(transformed_frame)
+
+        # Reshape back to original format
+        vertice = np.array(transformed_frames).reshape(num_frames, -1)
+
         vertice = torch.from_numpy(vertice)
-        vertice = torch.unsqueeze(vertice,0)
-        audio, vertice, template, one_hot_all, emo_one_hot= audio.to(device="cuda"), vertice.to(device="cuda"), template.to(device="cuda"), one_hot_all.to(device="cuda"), emo_one_hot.to(device="cuda")
+        vertice = torch.unsqueeze(vertice, 0)
+        audio, vertice, template, one_hot_all, emo_one_hot = (
+            audio.to(device="cuda"),
+            vertice.to(device="cuda"),
+            template.to(device="cuda"),
+            one_hot_all.to(device="cuda"),
+            emo_one_hot.to(device="cuda"),
+        )
+
+        # Extract subject information and determine emotion label
         train_subject = "_".join(file_name[0].split("_")[:-1])
+        base_name = file_name[0].split(".")[0]
+
+        # Determine emotion label based on sentence ID (following data_loader.py logic)
+        sentence_part = file_name[0].split(".")[0].split("_")[1]
+        if sentence_part.startswith('e'):
+            sentence_id = int(sentence_part[1:])
+        else:
+            sentence_id = int(sentence_part)
+        emotion_label = "emotional" if sentence_id > 40 else "neutral"
+
+        # Get corresponding audio file path for video rendering
+        audio_file_path = os.path.join(args.dataset, args.wav_path, file_name[0])
+
         if train_subject in train_subjects_list:
             condition_subject = train_subject
             iter = train_subjects_list.index(condition_subject)
-            one_hot = one_hot_all[:,iter,:]
+            one_hot = one_hot_all[:, iter, :]
             prediction = model.predict(audio, template, one_hot, emo_one_hot)
             prediction = prediction.squeeze()
-            np.save(os.path.join(result_path, file_name[0].split(".")[0]+"_condition_"+condition_subject+".npy"), prediction.detach().cpu().numpy())
+
+            # Save prediction
+            prediction_filename = base_name + "_condition_" + condition_subject + ".npy"
+            prediction_path = os.path.join(result_path, prediction_filename)
+            np.save(prediction_path, prediction.detach().cpu().numpy())
         else:
             for iter in range(one_hot_all.shape[-1]):
                 condition_subject = train_subjects_list[iter]
-                one_hot = one_hot_all[:,iter,:]
-                prediction = model.predict(audio, template, one_hot)
+                one_hot = one_hot_all[:, iter, :]
+                prediction = model.predict(audio, template, one_hot, emo_one_hot)
                 prediction = prediction.squeeze()
-                np.save(os.path.join(result_path, file_name[0].split(".")[0]+"_condition_"+condition_subject+".npy"), prediction.detach().cpu().numpy())
+
+                # Save prediction
+                prediction_filename = base_name + "_condition_" + condition_subject + ".npy"
+                prediction_path = os.path.join(result_path, prediction_filename)
+                np.save(prediction_path, prediction.detach().cpu().numpy())
+
+        # Create video
+        try:
+            create_video_from_prediction(
+                prediction_path=prediction_path,
+                subject=train_subject,
+                condition_subject=condition_subject,
+                base_name=base_name,
+                output_dir=video_output_dir,
+                emotion_label=emotion_label,
+                audio_path=audio_file_path if os.path.exists(audio_file_path) else None,
+                fps=args.output_fps,
+            )
+            print(f"Video created for {prediction_filename}")
+        except Exception as e:
+            print(f"Warning: Could not create video for {prediction_filename}. Error: {e}")
 
 
 def count_parameters(model):
@@ -137,24 +259,32 @@ def count_parameters(model):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='FaceXHuBERT: Text-less Speech-driven E(X)pressive 3D Facial Animation Synthesis using Self-Supervised Speech Representation Learning')
+    parser = argparse.ArgumentParser(
+        description='FaceXHuBERT: Text-less Speech-driven E(X)pressive 3D Facial Animation Synthesis using Self-Supervised Speech Representation Learning'
+    )
     parser.add_argument("--lr", type=float, default=0.0001, help='learning rate')
     parser.add_argument("--dataset", type=str, default="BIWI", help='Name of the dataset folder. eg: BIWI')
     parser.add_argument("--vertice_dim", type=int, default=70110, help='number of vertices - 23370*3 for BIWI dataset')
     parser.add_argument("--feature_dim", type=int, default=256, help='GRU Vertex decoder hidden size')
-    parser.add_argument("--wav_path", type=str, default= "wav", help='path of the audio signals')
+    parser.add_argument("--wav_path", type=str, default="wav", help='path of the audio signals')
     parser.add_argument("--vertices_path", type=str, default="vertices_npy", help='path of the ground truth')
     parser.add_argument("--gradient_accumulation_steps", type=int, default=1, help='gradient accumulation')
     parser.add_argument("--max_epoch", type=int, default=100, help='number of epochs')
     parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--template_file", type=str, default="templates_scaled.pkl", help='path of the train subject templates')
+    parser.add_argument(
+        "--template_file", type=str, default="templates_scaled.pkl", help='path of the train subject templates'
+    )
     parser.add_argument("--save_path", type=str, default="save", help='path of the trained models')
     parser.add_argument("--result_path", type=str, default="result", help='path to the predictions')
     parser.add_argument("--train_subjects", type=str, default="F1 F2 F3 F4 F5 F6 F7 F8 M1 M2 M3 M4 M5 M6")
     parser.add_argument("--val_subjects", type=str, default="F1 F2 F3 F4 F5 F6 F7 F8 M1 M2 M3 M4 M5 M6")
     parser.add_argument("--test_subjects", type=str, default="F1 F2 F3 F4 F5 F6 F7 F8 M1 M2 M3 M4 M5 M6")
-    parser.add_argument("--input_fps", type=int, default=50, help='HuBERT last hidden state produces 50 fps audio representation')
-    parser.add_argument("--output_fps", type=int, default=25, help='fps of the visual data, BIWI was captured in 25 fps')
+    parser.add_argument(
+        "--input_fps", type=int, default=50, help='HuBERT last hidden state produces 50 fps audio representation'
+    )
+    parser.add_argument(
+        "--output_fps", type=int, default=25, help='fps of the visual data, BIWI was captured in 25 fps'
+    )
     args = parser.parse_args()
 
     model = FaceXHuBERT(args)
@@ -165,9 +295,9 @@ def main():
     model = model.to(torch.device("cuda"))
     dataset = get_dataloaders(args)
     criterion = nn.HuberLoss()
-    optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad,model.parameters()), lr=args.lr)
+    optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
 
-    model = trainer(args, dataset["train"], dataset["valid"],model, optimizer, criterion, epoch=args.max_epoch)
+    model = trainer(args, dataset["train"], dataset["valid"], model, optimizer, criterion, epoch=args.max_epoch)
 
     test(args, model, dataset["test"], epoch=args.max_epoch)
 

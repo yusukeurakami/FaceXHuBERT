@@ -1,20 +1,15 @@
 import argparse
-import gc
 import os
 import pickle as pkl
 import time
 
-import cv2
-import ffmpeg
 import librosa
 import numpy as np
-import pyrender
 import torch
-import trimesh
 from transformers import Wav2Vec2Processor
 
 from faceXhubert import FaceXHuBERT
-from gt_renderer import transform_gt_to_template_space  # noqa: F401
+from video_utils import create_video_from_prediction
 
 
 def test_model(args):
@@ -74,75 +69,25 @@ def test_model(args):
 
 
 def render(args):
-    fps = args.fps
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    render_path = "demo/render/"
-    frames_folder = render_path + "frames/"
-    video_woA_folder = render_path + "video_wo_audio/"
-    video_wA_folder = render_path + "video_with_audio/"
-    emo_label = "emotional"
-    if args.emotion == 0:
-        emo_label = "neutral"
-
+    emo_label = "emotional" if args.emotion == 1 else "neutral"
     wav_path = args.wav_path
     test_name = os.path.basename(wav_path).split(".")[0]
     out_file_name = test_name + "_" + emo_label + "_" + args.subject + "_Condition_" + args.condition
     predicted_vertices_path = os.path.join(args.result_path, out_file_name + ".npy")
 
-    cam = pyrender.PerspectiveCamera(yfov=np.pi / 3.0, aspectRatio=1.414)
-    camera_pose = np.array([[1.0, 0, 0.0, 0.00], [0.0, -1.0, 0.0, 0.00], [0.0, 0.0, 1.0, -1.6], [0.0, 0.0, 0.0, 1.0]])
+    print("Rendering the predicted sequence:", test_name)
 
-    light = pyrender.DirectionalLight(color=[1.0, 1.0, 1.0], intensity=10.0)
-
-    r = pyrender.OffscreenRenderer(1920, 1440)
-
-    template_data = None
-    with open("BIWI/templates_scaled.pkl", "rb") as f:
-        template_data = pkl.load(f)
-
-    # Load the face topology from the reference OBJ file
-    topology_mesh = trimesh.load_mesh("BIWI/templates/BIWI_topology.obj")
-
-    print("rendering the predicted sequence: ", test_name)
-
-    video_woA_path = video_woA_folder + out_file_name + '.mp4'
-    video_wA_path = video_wA_folder + out_file_name + '.mp4'
-    video = cv2.VideoWriter(video_woA_path, fourcc, fps, (1920, 1440))
-
-    ref_mesh = trimesh.Trimesh(vertices=template_data[args.subject], faces=topology_mesh.faces)
-    seq = np.load(predicted_vertices_path)
-    seq = np.reshape(seq, (-1, 70110 // 3, 3))
-
-    # seq_transformed = np.zeros_like(seq)
-    # for f in range(seq.shape[0]):
-    #     seq_transformed[f] = transform_gt_to_template_space(seq[f], template_data[args.subject])
-    # seq = seq_transformed
-
-    ref_mesh.vertices = seq[0, :, :]
-    py_mesh = pyrender.Mesh.from_trimesh(ref_mesh)
-
-    for f in range(seq.shape[0]):
-        ref_mesh.vertices = seq[f, :, :]
-        py_mesh = pyrender.Mesh.from_trimesh(ref_mesh)
-        scene = pyrender.Scene()
-        scene.add(py_mesh)
-
-        scene.add(cam, pose=camera_pose)
-        scene.add(light, pose=camera_pose)
-        color, _ = r.render(scene)
-
-        output_frame = frames_folder + "frame" + str(f) + ".jpg"
-        cv2.imwrite(output_frame, color)
-        frame = cv2.imread(output_frame)
-        video.write(frame)
-    video.release()
-
-    input_video = ffmpeg.input(video_woA_path)
-    input_audio = ffmpeg.input(wav_path)
-
-    ffmpeg.concat(input_video, input_audio, v=1, a=1).output(video_wA_path).run()
-    del video, seq, ref_mesh
-    gc.collect()
+    # Use the shared video utils for rendering
+    create_video_from_prediction(
+        prediction_path=predicted_vertices_path,
+        subject=args.subject,
+        condition_subject=args.condition,
+        base_name=test_name,
+        output_dir="demo/render",
+        emotion_label=emo_label,
+        audio_path=wav_path,
+        fps=args.fps,
+    )
 
 
 def main():

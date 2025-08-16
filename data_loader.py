@@ -66,9 +66,6 @@ def read_data(args):
     audio_path = os.path.join(args.dataset, args.wav_path)
     vertices_path = os.path.join(args.dataset, args.vertices_path)
     ckpt = "facebook/hubert-xlarge-ls960-ft"
-    # feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(ckpt)
-    # tokenizer = Wav2Vec2CTCTokenizer.from_pretrained(ckpt)
-    # processor = Wav2Vec2Processor(feature_extractor=feature_extractor, tokenizer=tokenizer)
     processor = Wav2Vec2Processor.from_pretrained(ckpt)  # HuBERT uses the processor of Wav2Vec 2.0
 
     template_file = os.path.join(args.dataset, args.template_file)
@@ -119,7 +116,7 @@ def read_data(args):
         if subject_id in subjects_dict["test"] and sentence_id in splits[args.dataset]['test']:
             test_data.append(v)
 
-    print(len(train_data), len(valid_data), len(test_data))
+    print(f"train: {len(train_data)}, valid: {len(valid_data)}, test: {len(test_data)}")
     return train_data, valid_data, test_data, subjects_dict
 
 
