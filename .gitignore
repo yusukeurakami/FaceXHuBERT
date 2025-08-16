@@ -1,5 +1,13 @@
 # ignore the data files
-BIWI/wav/*.wav
+BIWI/wav
+BIWI/vertices_npy
+BIWI/templates/*.obj
+BIWI/templates/*.pkl
+
+__pycache__/
+
+# Hubert model
+facebook/
 
 # ignore the following extensions
 *.npy
