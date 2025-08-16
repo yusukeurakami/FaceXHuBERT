@@ -24,6 +24,7 @@ class VideoRenderer:
         resolution: Tuple[int, int] = (1920, 1440),
         template_path: str = "BIWI/templates_scaled.pkl",
         topology_path: str = "BIWI/templates/BIWI_topology.obj",
+        apply_transform: bool = False,
     ):
         """
         Initialize the video renderer.
@@ -37,6 +38,7 @@ class VideoRenderer:
         self.fps = fps
         self.resolution = resolution
         self.fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        self.apply_transform = apply_transform
 
         # Load template data
         with open(template_path, 'rb') as f:
@@ -88,10 +90,12 @@ class VideoRenderer:
         self.template_vertices = ref_mesh.vertices
 
         # Transform sequence to template space
-        # seq_transformed = np.zeros_like(seq)
-        # for f in range(seq.shape[0]):
-        #     seq_transformed[f] = transform_gt_to_template_space(seq[f], self.template_vertices)
-        seq_transformed = seq
+        if self.apply_transform:
+            seq_transformed = np.zeros_like(seq)
+            for f in range(seq.shape[0]):
+                seq_transformed[f] = transform_gt_to_template_space(seq[f], self.template_vertices)
+        else:
+            seq_transformed = seq
 
         # Initialize video writer
         video = cv2.VideoWriter(output_video_path, self.fourcc, self.fps, self.resolution)

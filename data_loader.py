@@ -66,6 +66,8 @@ def read_data(args):
     audio_path = os.path.join(args.dataset, args.wav_path)
     vertices_path = os.path.join(args.dataset, args.vertices_path)
     ckpt = "facebook/hubert-xlarge-ls960-ft"
+    # ckpt = "facebook/hubert-large-ls960-ft"
+    # ckpt = "facebook/hubert-base-ls960"
     processor = Wav2Vec2Processor.from_pretrained(ckpt)  # HuBERT uses the processor of Wav2Vec 2.0
 
     template_file = os.path.join(args.dataset, args.template_file)

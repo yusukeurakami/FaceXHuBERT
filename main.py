@@ -45,7 +45,6 @@ def trainer(args, train_loader, dev_loader, model, optimizer, criterion, epoch=1
             vertice = str(vertice[0])
             vertice = np.load(vertice, allow_pickle=True)
             vertice = vertice.astype(np.float32)
-
             # Apply transformation to match template coordinate system
             template_vertices = template[0].cpu().numpy().reshape(-1, 3)  # Reshape to (num_vertices, 3)
 
