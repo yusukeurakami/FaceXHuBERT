@@ -3,70 +3,59 @@ channels:
   - defaults
   - conda-forge
 dependencies:
-  - argon2-cffi=20.1.0=py38h2bbff1b_1
-  - async_generator=1.10=pyhd3eb1b0_0
-  - attrs=21.2.0=pyhd3eb1b0_0
-  - backcall=0.2.0=pyhd3eb1b0_0
-  - bleach=4.0.0=pyhd3eb1b0_0
-  - ca-certificates=2021.10.26=haa95532_2
-  - certifi=2021.10.8=py38haa95532_2
-  - cffi=1.15.0=py38h2bbff1b_0
-  - colorama=0.4.4=pyhd3eb1b0_0
-  - console_shortcut=0.1.1=4
-  - debugpy=1.5.1=py38hd77b12b_0
-  - defusedxml=0.7.1=pyhd3eb1b0_0
-  - entrypoints=0.3=py38_0
-  - importlib-metadata=4.8.2=py38haa95532_0
-  - importlib_metadata=4.8.2=hd3eb1b0_0
-  - ipykernel=6.4.1=py38haa95532_1
-  - ipython=7.29.0=py38hd4e2768_0
-  - ipython_genutils=0.2.0=pyhd3eb1b0_1
-  - jedi=0.18.0=py38haa95532_1
-  - jsonschema=3.2.0=pyhd3eb1b0_2
-  - jupyter_client=7.1.0=pyhd3eb1b0_0
-  - jupyter_core=4.9.1=py38haa95532_0
-  - jupyterlab_pygments=0.1.2=py_0
-  - m2w64-gcc-libgfortran=5.3.0=6
-  - m2w64-gcc-libs=5.3.0=7
-  - m2w64-gcc-libs-core=5.3.0=7
-  - m2w64-gmp=6.1.0=2
-  - m2w64-libwinpthread-git=5.0.0.4634.697f757=2
-  - markupsafe=2.0.1=py38h2bbff1b_0
-  - matplotlib-inline=0.1.2=pyhd3eb1b0_2
-  - mistune=0.8.4=py38he774522_1000
-  - msys2-conda-epoch=20160418=1
-  - nbclient=0.5.3=pyhd3eb1b0_0
-  - nest-asyncio=1.5.1=pyhd3eb1b0_0
-  - notebook=6.4.6=py38haa95532_0
-  - openssl=1.1.1m=h2bbff1b_0
-  - packaging=21.3=pyhd3eb1b0_0
-  - pandocfilters=1.4.3=py38haa95532_1
-  - parso=0.8.3=pyhd3eb1b0_0
-  - pickleshare=0.7.5=pyhd3eb1b0_1003
-  - pip=21.2.2=py38haa95532_0
-  - prometheus_client=0.12.0=pyhd3eb1b0_0
-  - prompt-toolkit=3.0.20=pyhd3eb1b0_0
-  - pycparser=2.21=pyhd3eb1b0_0
-  - pygments=2.10.0=pyhd3eb1b0_0
-  - pyparsing=3.0.4=pyhd3eb1b0_0
-  - pyrsistent=0.18.0=py38h196d8e1_0
-  - python=3.8.12=h6244533_0
-  - python-dateutil=2.8.2=pyhd3eb1b0_0
-  - pywin32=302=py38h827c3e9_1
-  - pywinpty=0.5.7=py38_0
-  - pyzmq=22.3.0=py38hd77b12b_2
-  - send2trash=1.8.0=pyhd3eb1b0_1
-  - sqlite=3.37.0=h2bbff1b_0
-  - terminado=0.9.4=py38haa95532_0
-  - testpath=0.5.0=pyhd3eb1b0_0
-  - tornado=6.1=py38h2bbff1b_0
-  - traitlets=5.1.1=pyhd3eb1b0_0
-  - wcwidth=0.2.5=pyhd3eb1b0_0
-  - webencodings=0.5.1=py38_1
-  - wheel=0.37.0=pyhd3eb1b0_1
-  - wincertstore=0.2=py38haa95532_2
-  - winpty=0.4.3=4
-  - zipp=3.6.0=pyhd3eb1b0_0
+  - argon2-cffi=20.1.0
+  - async_generator=1.10
+  - attrs=21.2.0
+  - backcall=0.2.0
+  - bleach=4.0.0
+  - ca-certificates=2021.10.26
+  - certifi=2021.10.8
+  - cffi=1.15.0
+  - colorama=0.4.4
+  - debugpy=1.5.1
+  - defusedxml=0.7.1
+  - entrypoints=0.3
+  - importlib-metadata=4.8.2
+  - importlib_metadata=4.8.2
+  - ipykernel=6.4.1
+  - ipython=7.29.0
+  - ipython_genutils=0.2.0
+  - jedi=0.18.0
+  - jsonschema=3.2.0
+  - jupyter_client=7.1.0
+  - jupyter_core=4.9.1
+  - jupyterlab_pygments=0.1.2
+  - markupsafe=2.0.1
+  - matplotlib-inline=0.1.2
+  - mistune=0.8.4
+  - nbclient=0.5.3
+  - nest-asyncio=1.5.1
+  - notebook=6.4.6
+  - openssl=1.1.1m
+  - packaging=21.3
+  - pandocfilters=1.4.3
+  - parso=0.8.3
+  - pickleshare=0.7.5
+  - pip=21.2.2
+  - prometheus_client=0.12.0
+  - prompt-toolkit=3.0.20
+  - pycparser=2.21
+  - pygments=2.10.0
+  - pyparsing=3.0.4
+  - pyrsistent=0.18.0
+  - python=3.8.12
+  - python-dateutil=2.8.2
+  - pyzmq=22.3.0
+  - send2trash=1.8.0
+  - sqlite=3.37.0
+  - terminado=0.9.4
+  - testpath=0.5.0
+  - tornado=6.1
+  - traitlets=5.1.1
+  - wcwidth=0.2.5
+  - webencodings=0.5.1
+  - wheel=0.37.0
+  - zipp=3.6.0
   - pip:
     - absl-py==0.15.0
     - ansiwrap==0.8.4
@@ -88,7 +77,7 @@ dependencies:
     - fonttools==4.28.5
     - freetype-py==2.2.0
     - future==0.18.2
-    - fvcore==0.1.5.post20220305
+    # - fvcore==0.1.5.post20220305
     - google-auth==2.3.3
     - google-auth-oauthlib==0.4.6
     - google-pasta==0.2.0

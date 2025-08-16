@@ -1,16 +1,18 @@
 import os
-import torch
-from collections import defaultdict
-from torch.utils import data
-import numpy as np
 import pickle
+from collections import defaultdict
+
+import librosa
+import numpy as np
+import torch
+from torch.utils import data
 from tqdm import tqdm
 from transformers import Wav2Vec2Processor
-import librosa    
 
 
 class Dataset(data.Dataset):
     """Custom data.Dataset compatible with data.DataLoader."""
+
     def __init__(self, data, subjects_dict, data_type="train"):
         self.data = data
         self.len = len(self.data)
@@ -25,7 +27,12 @@ class Dataset(data.Dataset):
         audio = self.data[index]["audio"]
         vertice = self.data[index]["vertice"]
         template = self.data[index]["template"]
-        sentence_id = int(file_name.split(".")[0].split("_")[1])
+        # Parse sentence_id from format like "M6_e25.wav" -> extract "25" from "e25"
+        sentence_part = file_name.split(".")[0].split("_")[1]
+        if sentence_part.startswith('e'):
+            sentence_id = int(sentence_part[1:])  # Remove 'e' prefix and convert to int
+        else:
+            sentence_id = int(sentence_part)  # Fallback for other formats
         if self.data_type == "train":
             subject = "_".join(file_name.split("_")[:-1])
             one_hot = self.one_hot_labels[self.subjects_dict["train"].index(subject)]
@@ -36,7 +43,14 @@ class Dataset(data.Dataset):
         else:
             emo_one_hot = self.emo_one_hot_labels[0]
 
-        return torch.FloatTensor(audio), vertice, torch.FloatTensor(template), torch.FloatTensor(one_hot), file_name, torch.FloatTensor(emo_one_hot)
+        return (
+            torch.FloatTensor(audio),
+            vertice,
+            torch.FloatTensor(template),
+            torch.FloatTensor(one_hot),
+            file_name,
+            torch.FloatTensor(emo_one_hot),
+        )
 
     def __len__(self):
         return self.len
@@ -51,25 +65,31 @@ def read_data(args):
 
     audio_path = os.path.join(args.dataset, args.wav_path)
     vertices_path = os.path.join(args.dataset, args.vertices_path)
-    processor = Wav2Vec2Processor.from_pretrained("facebook/hubert-xlarge-ls960-ft") # HuBERT uses the processor of Wav2Vec 2.0
+    ckpt = "facebook/hubert-xlarge-ls960-ft"
+    # feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(ckpt)
+    # tokenizer = Wav2Vec2CTCTokenizer.from_pretrained(ckpt)
+    # processor = Wav2Vec2Processor(feature_extractor=feature_extractor, tokenizer=tokenizer)
+    processor = Wav2Vec2Processor.from_pretrained(ckpt)  # HuBERT uses the processor of Wav2Vec 2.0
 
     template_file = os.path.join(args.dataset, args.template_file)
     with open(template_file, 'rb') as fin:
-        templates = pickle.load(fin,encoding='latin1')
-    
+        templates = pickle.load(fin, encoding='latin1')
+
     for r, ds, fs in os.walk(audio_path):
         for f in tqdm(fs):
             if f.endswith("wav"):
-                wav_path = os.path.join(r,f)
+                wav_path = os.path.join(r, f)
                 speech_array, sampling_rate = librosa.load(wav_path, sr=16000)
-                input_values = processor(speech_array, return_tensors="pt", padding="longest", sampling_rate=sampling_rate).input_values
+                input_values = processor(
+                    speech_array, return_tensors="pt", padding="longest", sampling_rate=sampling_rate
+                ).input_values
                 key = f.replace("wav", "npy")
                 data[key]["audio"] = input_values
                 subject_id = "_".join(key.split("_")[:-1])
                 temp = templates[subject_id]
                 data[key]["name"] = f
-                data[key]["template"] = temp.reshape((-1)) 
-                vertice_path = os.path.join(vertices_path,f.replace("wav", "npy"))
+                data[key]["template"] = temp.reshape((-1))
+                vertice_path = os.path.join(vertices_path, f.replace("wav", "npy"))
                 if not os.path.exists(vertice_path):
                     del data[key]
                     # print("Vertices Data Not Found! ", vertice_path)
@@ -81,8 +101,14 @@ def read_data(args):
     subjects_dict["val"] = [i for i in args.val_subjects.split(" ")]
     subjects_dict["test"] = [i for i in args.test_subjects.split(" ")]
 
-    splits = {'BIWI': {'train': list(range(1, 37)) + list(range(41, 77)), 'val': list(range(37, 39)) + list(range(77, 79)), 'test': list(range(39, 41)) + list(range(79, 81))}}
-   
+    splits = {
+        'BIWI': {
+            'train': list(range(1, 37)) + list(range(41, 77)),
+            'val': list(range(37, 39)) + list(range(77, 79)),
+            'test': list(range(39, 41)) + list(range(79, 81)),
+        }
+    }
+
     for k, v in data.items():
         subject_id = "_".join(k.split("_")[:-1])
         sentence_id = int(k.split(".")[0][-2:])
@@ -100,16 +126,14 @@ def read_data(args):
 def get_dataloaders(args):
     dataset = {}
     train_data, valid_data, test_data, subjects_dict = read_data(args)
-    train_data = Dataset(train_data, subjects_dict,"train")
+    train_data = Dataset(train_data, subjects_dict, "train")
     dataset["train"] = data.DataLoader(dataset=train_data, batch_size=1, shuffle=True)
-    valid_data = Dataset(valid_data, subjects_dict,"val")
+    valid_data = Dataset(valid_data, subjects_dict, "val")
     dataset["valid"] = data.DataLoader(dataset=valid_data, batch_size=1, shuffle=False)
-    test_data = Dataset(test_data, subjects_dict,"test")
+    test_data = Dataset(test_data, subjects_dict, "test")
     dataset["test"] = data.DataLoader(dataset=test_data, batch_size=1, shuffle=False)
     return dataset
 
 
 if __name__ == "__main__":
     get_dataloaders()
-
-    

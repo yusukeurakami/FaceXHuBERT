@@ -5,3 +5,4 @@ BIWI/wav/*.wav
 *.npy
 *.pth
 *.mp4
+*.jpg
