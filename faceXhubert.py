@@ -66,15 +66,23 @@ class FaceXHuBERT(nn.Module):
                     param.requires_grad = False
 
         # Vertex Decoder
-        # GRU module
-        self.gru = nn.GRU(self.audio_dim * 2, args.feature_dim, self.gru_layer_dim, batch_first=True, dropout=0.3)
+        # GRU module - Dynamic input size based on FPS ratio
+        if args.input_fps % args.output_fps == 0:
+            # Factor-based adjustment (like BIWI: 50->25) - audio features are concatenated
+            gru_input_size = self.audio_dim * 2
+        else:
+            # Interpolation-based adjustment (like VOCASET: 50->60) - audio features stay same size
+            gru_input_size = self.audio_dim
+
+        self.gru = nn.GRU(gru_input_size, args.feature_dim, self.gru_layer_dim, batch_first=True, dropout=0.3)
         # Fully connected layer
         self.fc = nn.Linear(args.feature_dim, args.vertice_dim)
         nn.init.constant_(self.fc.weight, 0)
         nn.init.constant_(self.fc.bias, 0)
 
-        # Subject embedding, S
-        self.obj_vector = nn.Linear(len(args.train_subjects.split()), args.feature_dim, bias=False)
+        # Subject embedding, S - Dynamic based on number of training subjects
+        num_subjects = len(args.train_subjects.split())
+        self.obj_vector = nn.Linear(num_subjects, args.feature_dim, bias=False)
 
         # Emotion embedding, E
         self.emo_vector = nn.Linear(2, args.feature_dim, bias=False)

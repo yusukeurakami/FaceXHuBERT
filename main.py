@@ -9,6 +9,7 @@ import torch.nn as nn
 from tqdm import tqdm
 
 from data_loader import get_dataloaders
+from dataset_config import auto_configure_args, should_apply_coordinate_transform
 from faceXhubert import FaceXHuBERT
 from gt_renderer import transform_gt_to_template_space
 from video_utils import create_video_from_prediction
@@ -45,22 +46,25 @@ def trainer(args, train_loader, dev_loader, model, optimizer, criterion, epoch=1
             vertice = str(vertice[0])
             vertice = np.load(vertice, allow_pickle=True)
             vertice = vertice.astype(np.float32)
-            # Apply transformation to match template coordinate system
-            template_vertices = template[0].cpu().numpy().reshape(-1, 3)  # Reshape to (num_vertices, 3)
 
-            # Reshape vertice data for transformation
-            num_frames, total_coords = vertice.shape
-            num_vertices = total_coords // 3
-            vertice_reshaped = vertice.reshape(num_frames, num_vertices, 3)
+            # Apply transformation only for datasets that require it (BIWI)
+            if should_apply_coordinate_transform(args.dataset):
+                # Apply transformation to match template coordinate system
+                template_vertices = template[0].cpu().numpy().reshape(-1, 3)  # Reshape to (num_vertices, 3)
 
-            # Apply transformation frame by frame
-            transformed_frames = []
-            for frame_idx in range(num_frames):
-                transformed_frame = transform_gt_to_template_space(vertice_reshaped[frame_idx], template_vertices)
-                transformed_frames.append(transformed_frame)
+                # Reshape vertice data for transformation
+                num_frames, total_coords = vertice.shape
+                num_vertices = total_coords // 3
+                vertice_reshaped = vertice.reshape(num_frames, num_vertices, 3)
 
-            # Reshape back to original format
-            vertice = np.array(transformed_frames).reshape(num_frames, -1)
+                # Apply transformation frame by frame
+                transformed_frames = []
+                for frame_idx in range(num_frames):
+                    transformed_frame = transform_gt_to_template_space(vertice_reshaped[frame_idx], template_vertices)
+                    transformed_frames.append(transformed_frame)
+
+                # Reshape back to original format
+                vertice = np.array(transformed_frames).reshape(num_frames, -1)
 
             vertice = torch.from_numpy(vertice)
             vertice = torch.unsqueeze(vertice, 0)
@@ -95,22 +99,24 @@ def trainer(args, train_loader, dev_loader, model, optimizer, criterion, epoch=1
             vertice = np.load(vertice, allow_pickle=True)
             vertice = vertice.astype(np.float32)
 
-            # Apply transformation to match template coordinate system
-            template_vertices = template[0].cpu().numpy().reshape(-1, 3)  # Reshape to (num_vertices, 3)
+            # Apply transformation only for datasets that require it (BIWI)
+            if should_apply_coordinate_transform(args.dataset):
+                # Apply transformation to match template coordinate system
+                template_vertices = template[0].cpu().numpy().reshape(-1, 3)  # Reshape to (num_vertices, 3)
 
-            # Reshape vertice data for transformation
-            num_frames, total_coords = vertice.shape
-            num_vertices = total_coords // 3
-            vertice_reshaped = vertice.reshape(num_frames, num_vertices, 3)
+                # Reshape vertice data for transformation
+                num_frames, total_coords = vertice.shape
+                num_vertices = total_coords // 3
+                vertice_reshaped = vertice.reshape(num_frames, num_vertices, 3)
 
-            # Apply transformation frame by frame
-            transformed_frames = []
-            for frame_idx in range(num_frames):
-                transformed_frame = transform_gt_to_template_space(vertice_reshaped[frame_idx], template_vertices)
-                transformed_frames.append(transformed_frame)
+                # Apply transformation frame by frame
+                transformed_frames = []
+                for frame_idx in range(num_frames):
+                    transformed_frame = transform_gt_to_template_space(vertice_reshaped[frame_idx], template_vertices)
+                    transformed_frames.append(transformed_frame)
 
-            # Reshape back to original format
-            vertice = np.array(transformed_frames).reshape(num_frames, -1)
+                # Reshape back to original format
+                vertice = np.array(transformed_frames).reshape(num_frames, -1)
 
             vertice = torch.from_numpy(vertice)
             vertice = torch.unsqueeze(vertice, 0)
@@ -138,7 +144,7 @@ def trainer(args, train_loader, dev_loader, model, optimizer, criterion, epoch=1
         current_loss = np.mean(valid_loss_log)
 
         val_losses.append(current_loss)
-        if (e % 25 == 0) or e == args.max_epoch:
+        if (e > 0 and e % 25 == 0) or e == args.max_epoch:
             torch.save(model.state_dict(), os.path.join(save_path, '{}_model.pth'.format(e)))
 
         print("epcoh: {}, current loss:{:.8f}".format(e + 1, current_loss))
@@ -171,22 +177,24 @@ def test(args, model, test_loader, epoch):
         vertice = np.load(vertice, allow_pickle=True)
         vertice = vertice.astype(np.float32)
 
-        # Apply transformation to match template coordinate system
-        template_vertices = template[0].cpu().numpy().reshape(-1, 3)  # Reshape to (num_vertices, 3)
+        # Apply transformation only for datasets that require it (BIWI)
+        if should_apply_coordinate_transform(args.dataset):
+            # Apply transformation to match template coordinate system
+            template_vertices = template[0].cpu().numpy().reshape(-1, 3)  # Reshape to (num_vertices, 3)
 
-        # Reshape vertice data for transformation
-        num_frames, total_coords = vertice.shape
-        num_vertices = total_coords // 3
-        vertice_reshaped = vertice.reshape(num_frames, num_vertices, 3)
+            # Reshape vertice data for transformation
+            num_frames, total_coords = vertice.shape
+            num_vertices = total_coords // 3
+            vertice_reshaped = vertice.reshape(num_frames, num_vertices, 3)
 
-        # Apply transformation frame by frame
-        transformed_frames = []
-        for frame_idx in range(num_frames):
-            transformed_frame = transform_gt_to_template_space(vertice_reshaped[frame_idx], template_vertices)
-            transformed_frames.append(transformed_frame)
+            # Apply transformation frame by frame
+            transformed_frames = []
+            for frame_idx in range(num_frames):
+                transformed_frame = transform_gt_to_template_space(vertice_reshaped[frame_idx], template_vertices)
+                transformed_frames.append(transformed_frame)
 
-        # Reshape back to original format
-        vertice = np.array(transformed_frames).reshape(num_frames, -1)
+            # Reshape back to original format
+            vertice = np.array(transformed_frames).reshape(num_frames, -1)
 
         vertice = torch.from_numpy(vertice)
         vertice = torch.unsqueeze(vertice, 0)
@@ -247,6 +255,7 @@ def test(args, model, test_loader, epoch):
                 emotion_label=emotion_label,
                 audio_path=audio_file_path if os.path.exists(audio_file_path) else None,
                 fps=args.output_fps,
+                dataset_type=args.dataset,
             )
             print(f"Video created for {prediction_filename}")
         except Exception as e:
@@ -262,8 +271,12 @@ def main():
         description='FaceXHuBERT: Text-less Speech-driven E(X)pressive 3D Facial Animation Synthesis using Self-Supervised Speech Representation Learning'
     )
     parser.add_argument("--lr", type=float, default=0.0001, help='learning rate')
-    parser.add_argument("--dataset", type=str, default="BIWI", help='Name of the dataset folder. eg: BIWI')
-    parser.add_argument("--vertice_dim", type=int, default=70110, help='number of vertices - 23370*3 for BIWI dataset')
+    parser.add_argument(
+        "--dataset", type=str, choices=["BIWI", "VOCASET"], default="BIWI", help='Dataset type: BIWI or VOCASET'
+    )
+    parser.add_argument(
+        "--vertice_dim", type=int, default=None, help='number of vertices (auto-set based on dataset if not specified)'
+    )
     parser.add_argument("--feature_dim", type=int, default=256, help='GRU Vertex decoder hidden size')
     parser.add_argument("--wav_path", type=str, default="wav", help='path of the audio signals')
     parser.add_argument("--vertices_path", type=str, default="vertices_npy", help='path of the ground truth')
@@ -271,20 +284,35 @@ def main():
     parser.add_argument("--max_epoch", type=int, default=100, help='number of epochs')
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument(
-        "--template_file", type=str, default="templates_scaled.pkl", help='path of the train subject templates'
+        "--template_file",
+        type=str,
+        default=None,
+        help='path of the train subject templates (auto-set based on dataset)',
     )
     parser.add_argument("--save_path", type=str, default="save", help='path of the trained models')
     parser.add_argument("--result_path", type=str, default="result", help='path to the predictions')
-    parser.add_argument("--train_subjects", type=str, default="F1 F2 F3 F4 F5 F6 F7 F8 M1 M2 M3 M4 M5 M6")
-    parser.add_argument("--val_subjects", type=str, default="F1 F2 F3 F4 F5 F6 F7 F8 M1 M2 M3 M4 M5 M6")
-    parser.add_argument("--test_subjects", type=str, default="F1 F2 F3 F4 F5 F6 F7 F8 M1 M2 M3 M4 M5 M6")
+    parser.add_argument(
+        "--train_subjects", type=str, default="", help='training subjects (auto-set based on dataset if not specified)'
+    )
+    parser.add_argument(
+        "--val_subjects", type=str, default="", help='validation subjects (auto-set based on dataset if not specified)'
+    )
+    parser.add_argument(
+        "--test_subjects", type=str, default="", help='test subjects (auto-set based on dataset if not specified)'
+    )
     parser.add_argument(
         "--input_fps", type=int, default=50, help='HuBERT last hidden state produces 50 fps audio representation'
     )
     parser.add_argument(
-        "--output_fps", type=int, default=25, help='fps of the visual data, BIWI was captured in 25 fps'
+        "--output_fps",
+        type=int,
+        default=None,
+        help='fps of the visual data (auto-set based on dataset if not specified)',
     )
     args = parser.parse_args()
+
+    # Auto-configure arguments based on dataset choice
+    args = auto_configure_args(args)
 
     model = FaceXHuBERT(args)
     print("model parameters: ", count_parameters(model))

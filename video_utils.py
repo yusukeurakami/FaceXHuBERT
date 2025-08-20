@@ -27,6 +27,7 @@ class VideoRenderer:
         apply_transform: bool = False,
         zoom_factor: float = 1.0,
         camera_distance: float = -1.6,
+        dataset_type: str = "BIWI",
     ):
         """
         Initialize the video renderer.
@@ -39,26 +40,68 @@ class VideoRenderer:
             apply_transform: Whether to apply coordinate transformation
             zoom_factor: Zoom factor for field of view (>1.0 = zoom in, <1.0 = zoom out)
             camera_distance: Distance of camera from object (negative values = closer)
+            dataset_type: Dataset type ("BIWI" or "VOCASET")
         """
         self.fps = fps
         self.resolution = resolution
         self.fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         self.apply_transform = apply_transform
+        self.dataset_type = dataset_type
 
-        # Load template data
-        with open(template_path, 'rb') as f:
-            self.template_data = pkl.load(f, encoding='latin1')
+        # Auto-configure paths based on dataset type if not explicitly provided
+        if template_path == "BIWI/templates_scaled.pkl" and dataset_type == "VOCASET":
+            template_path = "VOCASET/templates/FLAME_sample.ply"
+            topology_path = "VOCASET/templates/FLAME_sample.ply"
 
-        # Load topology mesh
-        self.topology_mesh = trimesh.load_mesh(topology_path, process=False)
+        # Load templates and topology based on dataset type
+        self.load_templates_and_topology(template_path, topology_path)
 
-        # Set up pyrender components
-        self.cam = pyrender.PerspectiveCamera(yfov=np.pi / 3.0, aspectRatio=1.414)
+        # Set up pyrender components with zoom support
+        base_fov = np.pi / 3.0
+        adjusted_fov = base_fov / zoom_factor
+        self.cam = pyrender.PerspectiveCamera(yfov=adjusted_fov, aspectRatio=1.414)
         self.camera_pose = np.array(
-            [[1.0, 0, 0.0, 0.00], [0.0, -1.0, 0.0, 0.00], [0.0, 0.0, 1.0, -1.6], [0.0, 0.0, 0.0, 1.0]]
+            [[1.0, 0, 0.0, 0.00], [0.0, -1.0, 0.0, 0.00], [0.0, 0.0, 1.0, camera_distance], [0.0, 0.0, 0.0, 1.0]]
         )
         self.light = pyrender.DirectionalLight(color=[1.0, 1.0, 1.0], intensity=10.0)
         self.renderer = pyrender.OffscreenRenderer(*resolution)
+
+    def load_templates_and_topology(self, template_path: str, topology_path: str):
+        """Load templates and topology based on dataset type."""
+        if self.dataset_type == "BIWI":
+            # Load pickle templates + OBJ topology
+            with open(template_path, 'rb') as f:
+                templates = pkl.load(f, encoding='latin1')
+                # Ensure templates are flattened
+                self.template_data = {}
+                for subject, template in templates.items():
+                    if len(template.shape) > 1:
+                        self.template_data[subject] = template.flatten()
+                    else:
+                        self.template_data[subject] = template
+            self.topology_mesh = trimesh.load_mesh(topology_path, process=False)
+        elif self.dataset_type == "VOCASET":
+            if template_path.endswith('.ply'):
+                # Load PLY template (vertices + faces)
+                mesh = trimesh.load_mesh(template_path, process=False)
+                # Create template for all subjects (use same template for all)
+                self.template_data = {"default": mesh.vertices.flatten()}
+                self.topology_mesh = mesh
+            else:
+                # Load pickle templates like BIWI
+                with open(template_path, 'rb') as f:
+                    templates = pkl.load(f, encoding='latin1')
+                    # Ensure templates are flattened
+                    self.template_data = {}
+                    for subject, template in templates.items():
+                        if len(template.shape) > 1:
+                            self.template_data[subject] = template.flatten()
+                        else:
+                            self.template_data[subject] = template
+                # Load topology mesh separately
+                self.topology_mesh = trimesh.load_mesh(topology_path, process=False)
+        else:
+            raise ValueError(f"Unsupported dataset type: {self.dataset_type}")
 
     def render_sequence_to_video(
         self,
@@ -86,15 +129,35 @@ class VideoRenderer:
         if output_with_audio_path:
             os.makedirs(os.path.dirname(output_with_audio_path), exist_ok=True)
 
-        # Load prediction data
+        # Load prediction data - dataset-aware reshaping
         seq = np.load(prediction_path)
-        seq = np.reshape(seq, (-1, 70110 // 3, 3))
+        if self.dataset_type == "BIWI":
+            seq = np.reshape(seq, (-1, 70110 // 3, 3))  # 23370 vertices
+            # Use subject-specific template
+            if subject in self.template_data:
+                template_vertices = self.template_data[subject].reshape(-1, 3)
+            else:
+                raise ValueError(f"Template not found for subject {subject} in BIWI dataset")
+        elif self.dataset_type == "VOCASET":
+            seq = np.reshape(seq, (-1, 15069 // 3, 3))  # 5023 vertices
+            # Use subject-specific template with _TA suffix or default
+            subject_with_ta = subject + "_TA"
+            if subject_with_ta in self.template_data:
+                template_vertices = self.template_data[subject_with_ta].reshape(-1, 3)
+            elif subject in self.template_data:
+                template_vertices = self.template_data[subject].reshape(-1, 3)
+            elif "default" in self.template_data:
+                template_vertices = self.template_data["default"].reshape(-1, 3)
+            else:
+                raise ValueError(f"Template not found for subject {subject} in VOCASET dataset")
+        else:
+            raise ValueError(f"Unsupported dataset type: {self.dataset_type}")
 
         # Create reference mesh using template vertices and topology faces
-        ref_mesh = trimesh.Trimesh(vertices=self.template_data[subject], faces=self.topology_mesh.faces)
+        ref_mesh = trimesh.Trimesh(vertices=template_vertices, faces=self.topology_mesh.faces)
         self.template_vertices = ref_mesh.vertices
 
-        # Transform sequence to template space
+        # Transform sequence to template space (only if needed)
         if self.apply_transform:
             seq_transformed = np.zeros_like(seq)
             for f in range(seq.shape[0]):
@@ -198,6 +261,7 @@ def create_video_from_prediction(
     emotion_label: str = "neutral",
     audio_path: Optional[str] = None,
     fps: float = 25.0,
+    dataset_type: str = "BIWI",
 ):
     """
     Convenience function to create a video from a prediction file.
@@ -211,8 +275,9 @@ def create_video_from_prediction(
         emotion_label: Emotion label for naming
         audio_path: Optional audio file path
         fps: Frame rate for video
+        dataset_type: Dataset type ("BIWI" or "VOCASET")
     """
-    renderer = VideoRenderer(fps=fps)
+    renderer = VideoRenderer(fps=fps, dataset_type=dataset_type)
     try:
         renderer.render_prediction_with_naming(
             prediction_path=prediction_path,

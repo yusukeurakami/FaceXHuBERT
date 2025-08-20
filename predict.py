@@ -8,6 +8,7 @@ import numpy as np
 import torch
 from transformers import Wav2Vec2Processor
 
+from dataset_config import auto_configure_args, get_dataset_config
 from faceXhubert import FaceXHuBERT
 from video_utils import create_video_from_prediction
 
@@ -21,9 +22,30 @@ def test_model(args):
     model = model.to(torch.device(args.device))
     model.eval()
 
-    template_file = os.path.join(args.dataset, args.template_path)
-    with open(template_file, 'rb') as fin:
-        templates = pkl.load(fin, encoding='latin1')
+    # Load templates based on dataset type
+    config = get_dataset_config(args.dataset_type)
+    template_file = os.path.join(args.dataset_type, config['template_file'])
+
+    if config['template_type'] == 'pickle':
+        with open(template_file, 'rb') as fin:
+            templates = pkl.load(fin, encoding='latin1')
+            # Flatten templates if needed
+            flattened_templates = {}
+            for subject, template in templates.items():
+                if len(template.shape) > 1:
+                    flattened_templates[subject] = template.flatten()
+                else:
+                    flattened_templates[subject] = template
+            templates = flattened_templates
+    elif config['template_type'] == 'ply':
+        import trimesh
+
+        mesh = trimesh.load_mesh(template_file)
+        # Create template for the subject (try both with and without _TA suffix)
+        templates = {args.subject: mesh.vertices.flatten()}
+        templates[args.subject + "_TA"] = mesh.vertices.flatten()
+    else:
+        raise ValueError(f"Unsupported template type: {config['template_type']}")
 
     train_subjects_list = [i for i in args.train_subjects.split(" ")]
 
@@ -77,7 +99,7 @@ def render(args):
 
     print("Rendering the predicted sequence:", test_name)
 
-    # Use the shared video utils for rendering
+    # Use the shared video utils for rendering with dataset type
     create_video_from_prediction(
         prediction_path=predicted_vertices_path,
         subject=args.subject,
@@ -87,6 +109,7 @@ def render(args):
         emotion_label=emo_label,
         audio_path=wav_path,
         fps=args.fps,
+        dataset_type=args.dataset_type,
     )
 
 
@@ -95,13 +118,19 @@ def main():
         description='FaceXHuBERT: Text-less Speech-driven E(X)pressive 3D Facial Animation Synthesis using Self-Supervised Speech Representation Learning'
     )
     parser.add_argument("--model_name", type=str, default="FaceXHuBERT")
-    parser.add_argument("--dataset", type=str, default="BIWI", help='name of the dataset folder. eg: BIWI')
-    parser.add_argument("--fps", type=float, default=25, help='frame rate - 25 for BIWI')
+    parser.add_argument(
+        "--dataset_type", type=str, choices=["BIWI", "VOCASET"], default="BIWI", help='Dataset type for prediction'
+    )
+    parser.add_argument("--fps", type=float, default=None, help='frame rate (auto-set based on dataset)')
     parser.add_argument("--feature_dim", type=int, default=256, help='GRU Vertex Decoder hidden size')
-    parser.add_argument("--vertice_dim", type=int, default=70110, help='number of vertices - 23370*3 for BIWI')
+    parser.add_argument("--vertice_dim", type=int, default=None, help='number of vertices (auto-set based on dataset)')
     parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--train_subjects", type=str, default="F1 F2 F3 F4 F5 F6 F7 F8 M1 M2 M3 M4 M5 M6")
-    parser.add_argument("--test_subjects", type=str, default="F1 F2 F3 F4 F5 F6 F7 F8 M1 M2 M3 M4 M5 M6")
+    parser.add_argument(
+        "--train_subjects", type=str, default="", help='training subjects (auto-set based on dataset if not specified)'
+    )
+    parser.add_argument(
+        "--test_subjects", type=str, default="", help='test subjects (auto-set based on dataset if not specified)'
+    )
     parser.add_argument(
         "--wav_path", type=str, default="demo/wav/test.wav", help='path of the input audio signal in .wav format'
     )
@@ -111,7 +140,7 @@ def main():
         "--subject", type=str, default="M1", help='select a subject from test_subjects or train_subjects'
     )
     parser.add_argument(
-        "--template_path", type=str, default="templates_scaled.pkl", help='path of the personalized templates'
+        "--template_path", type=str, default=None, help='path of the personalized templates (auto-set based on dataset)'
     )
     parser.add_argument(
         "--render_template_path", type=str, default="templates", help='path of the mesh in BIWI topology'
@@ -120,7 +149,7 @@ def main():
         "--input_fps", type=int, default=50, help='HuBERT last hidden state produces 50 fps audio representation'
     )
     parser.add_argument(
-        "--output_fps", type=int, default=25, help='fps of the visual data, BIWI was captured in 25 fps'
+        "--output_fps", type=int, default=None, help='fps of the visual data (auto-set based on dataset)'
     )
     parser.add_argument(
         "--emotion",
@@ -129,6 +158,11 @@ def main():
         help='style control for emotion, 1 for expressive animation, 0 for neutral animation',
     )
     args = parser.parse_args()
+
+    # Auto-configure arguments based on dataset choice
+    args = auto_configure_args(args)
+    # Add dataset attribute for backward compatibility
+    args.dataset = args.dataset_type
 
     test_model(args)
     render(args)
