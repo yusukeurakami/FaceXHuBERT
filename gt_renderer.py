@@ -47,23 +47,85 @@ def transform_gt_to_template_space(gt_data, template_vertices):
     return gt_final
 
 
-def main():
-    gt_folder = "./Evaluation/GroundTruth/"
-    audio_folder = "./BIWI/wav/"
-    gt_seq_name = "F1_e39.npy"
-    audio_name = "F1_e39.wav"
+def main(
+    dataset_type="BIWI",
+    gt_seq_name=None,
+    audio_name=None,
+    subject_id="F1",
+    gt_folder=None,
+    audio_folder=None,
+    video_folder=None,
+    zoom_factor=1.0,
+    camera_distance=-1.6,
+):
+    """
+    Render ground truth sequences for facial animation.
 
-    # output folder
-    video_folder = "gt_videos/"
-    frames_folder = "gt_videos/frames/"
+    Args:
+        dataset_type (str): Dataset type - "BIWI" or "VOCASET"
+        gt_seq_name (str): Name of the ground truth sequence file (without extension for VOCASET)
+        audio_name (str): Name of the audio file
+        subject_id (str): Subject ID for BIWI dataset (e.g., "F1", "M1")
+        gt_folder (str): Path to ground truth folder
+        audio_folder (str): Path to audio folder
+        video_folder (str): Output video folder
+        zoom_factor (float): Zoom factor for field of view (>1.0 = zoom in, <1.0 = zoom out)
+        camera_distance (float): Distance of camera from object (negative values = closer)
+    """
+
+    # Set default values based on dataset type
+    if dataset_type == "BIWI":
+        if gt_folder is None:
+            gt_folder = "./Evaluation/GroundTruth/"
+        if audio_folder is None:
+            audio_folder = "./BIWI/wav/"
+        if gt_seq_name is None:
+            gt_seq_name = "F1_e39.npy"
+        if audio_name is None:
+            audio_name = "F1_e39.wav"
+        vertice_dim = 70110  # 23370 vertices * 3
+        template_path = "./BIWI/templates/BIWI_topology.obj"
+        template_data_path = "BIWI/templates_scaled.pkl"
+        fps = 25
+        # Apply zoom factor to field of view (smaller FOV = zoomed in)
+        base_fov = np.pi / 3.0
+        adjusted_fov = base_fov / zoom_factor
+        cam = pyrender.PerspectiveCamera(yfov=adjusted_fov, aspectRatio=1.414)
+        camera_pose = np.array(
+            [[1.0, 0, 0.0, 0.00], [0.0, -1.0, 0.0, 0.00], [0.0, 0.0, 1.0, camera_distance], [0.0, 0.0, 0.0, 1.0]]
+        )
+
+    elif dataset_type == "VOCASET":
+        if gt_folder is None:
+            gt_folder = "./VOCASET/vertices_npy/"
+        if audio_folder is None:
+            audio_folder = "./VOCASET/wav/"
+        if gt_seq_name is None:
+            gt_seq_name = "FaceTalk_170725_00137_TA_sentence01.npy"
+        if audio_name is None:
+            audio_name = "FaceTalk_170725_00137_TA_sentence01.wav"
+        vertice_dim = 15069  # 5023 vertices * 3
+        template_path = "./VOCASET/templates/FLAME_sample.ply"
+        template_data_path = None  # VOCASET uses direct PLY template
+        fps = 60
+        # Apply zoom factor to field of view (smaller FOV = zoomed in)
+        base_fov = np.pi / 3.0
+        adjusted_fov = base_fov / zoom_factor
+        cam = pyrender.PerspectiveCamera(yfov=adjusted_fov, aspectRatio=1.414)
+        camera_pose = np.array(
+            [[1.0, 0, 0.0, 0.00], [0.0, -1.0, 0.0, 0.00], [0.0, 0.0, 1.0, camera_distance], [0.0, 0.0, 0.0, 1.0]]
+        )
+    else:
+        raise ValueError(f"Unsupported dataset type: {dataset_type}")
+
+    # Set output folder
+    if video_folder is None:
+        video_folder = f"gt_videos_{dataset_type.lower()}/"
+    frames_folder = video_folder + "frames/"
     os.makedirs(video_folder, exist_ok=True)
     os.makedirs(frames_folder, exist_ok=True)
 
-    fps = 25
     fourcc = cv2.VideoWriter_fourcc(*'MP4V')
-
-    cam = pyrender.PerspectiveCamera(yfov=np.pi / 3.0, aspectRatio=1.414)
-    camera_pose = np.array([[1.0, 0, 0.0, 0.00], [0.0, -1.0, 0.0, 0.00], [0.0, 0.0, 1.0, -1.6], [0.0, 0.0, 0.0, 1.0]])
 
     light = pyrender.DirectionalLight(color=[1.0, 1.0, 1.0], intensity=10.0)
 
@@ -77,16 +139,22 @@ def main():
     gt_seq_path = gt_folder + gt_seq_name
     audio_path = audio_folder + audio_name
     gt_seq = np.load(gt_seq_path)
-    gt_seq = np.reshape(gt_seq, (-1, 70110 // 3, 3))
+    gt_seq = np.reshape(gt_seq, (-1, vertice_dim // 3, 3))
 
-    # render_mesh = trimesh.load_mesh("./BIWI/templates/BIWI_topology.obj", process=False)
-    topology_mesh = trimesh.load_mesh("./BIWI/templates/BIWI_topology.obj", process=False)
+    # Load template and create render mesh based on dataset type
+    if dataset_type == "BIWI":
+        topology_mesh = trimesh.load_mesh(template_path, process=False)
 
-    template_data = None
-    with open("BIWI/templates_scaled.pkl", "rb") as f:
-        template_data = pkl.load(f)
+        template_data = None
+        with open(template_data_path, "rb") as f:
+            template_data = pkl.load(f)
 
-    render_mesh = trimesh.Trimesh(vertices=template_data["F1"], faces=topology_mesh.faces)
+        render_mesh = trimesh.Trimesh(vertices=template_data[subject_id], faces=topology_mesh.faces)
+
+    elif dataset_type == "VOCASET":
+        # Load FLAME template directly
+        render_mesh = trimesh.load_mesh(template_path, process=False)
+
     template_vertices = render_mesh.vertices
 
     # Apply coordinate transformation to GT sequence
@@ -120,4 +188,58 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Render ground truth sequences for facial animation")
+    parser.add_argument(
+        "--dataset_type", type=str, default="BIWI", choices=["BIWI", "VOCASET"], help="Dataset type: BIWI or VOCASET"
+    )
+    parser.add_argument("--gt_seq_name", type=str, default=None, help="Ground truth sequence file name")
+    parser.add_argument("--audio_name", type=str, default=None, help="Audio file name")
+    parser.add_argument("--subject_id", type=str, default="F1", help="Subject ID for BIWI dataset (e.g., F1, M1)")
+    parser.add_argument("--gt_folder", type=str, default=None, help="Path to ground truth folder")
+    parser.add_argument("--audio_folder", type=str, default=None, help="Path to audio folder")
+    parser.add_argument("--video_folder", type=str, default=None, help="Output video folder")
+    parser.add_argument(
+        "--zoom_factor", type=float, default=1.0, help="Zoom factor for field of view (>1.0 = zoom in, <1.0 = zoom out)"
+    )
+    parser.add_argument(
+        "--camera_distance", type=float, default=-1.6, help="Distance of camera from object (negative values = closer)"
+    )
+
+    args = parser.parse_args()
+
+    # Call main with parsed arguments
+    main(
+        dataset_type=args.dataset_type,
+        gt_seq_name=args.gt_seq_name,
+        audio_name=args.audio_name,
+        subject_id=args.subject_id,
+        gt_folder=args.gt_folder,
+        audio_folder=args.audio_folder,
+        video_folder=args.video_folder,
+        zoom_factor=args.zoom_factor,
+        camera_distance=args.camera_distance,
+    )
+
+    print("\n=== Usage Examples ===")
+    print("# For BIWI dataset (default):")
+    print("python gt_renderer.py --dataset_type BIWI --subject_id F1 --gt_seq_name F1_e39.npy --audio_name F1_e39.wav")
+    print("\n# For VOCASET dataset:")
+    print(
+        "python gt_renderer.py --dataset_type VOCASET --gt_seq_name FaceTalk_170904_03276_TA_sentence01.npy --audio_name FaceTalk_170904_03276_TA_sentence01.wav"
+    )
+    print("\n# With zoom functionality:")
+    print("python gt_renderer.py --dataset_type BIWI --subject_id F1 --zoom_factor 2.0 --camera_distance -1.2")
+    print("\n# With custom paths:")
+    print(
+        "python gt_renderer.py --dataset_type VOCASET --gt_folder ./custom_gt/ --audio_folder ./custom_audio/ --video_folder ./custom_output/"
+    )
+    print("\n=== Zoom Parameters ===")
+    print("--zoom_factor: Controls field of view (>1.0 = zoom in, <1.0 = zoom out)")
+    print("  • 1.0 = normal view")
+    print("  • 2.0 = 2x zoom in (recommended for close-up)")
+    print("  • 0.5 = 2x zoom out (wider view)")
+    print("--camera_distance: Controls camera position (-1.6 = default)")
+    print("  • -1.2 = closer to object")
+    print("  • -2.0 = further from object")

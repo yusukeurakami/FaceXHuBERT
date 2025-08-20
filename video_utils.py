@@ -25,6 +25,8 @@ class VideoRenderer:
         template_path: str = "BIWI/templates_scaled.pkl",
         topology_path: str = "BIWI/templates/BIWI_topology.obj",
         apply_transform: bool = False,
+        zoom_factor: float = 1.0,
+        camera_distance: float = -1.6,
     ):
         """
         Initialize the video renderer.
@@ -34,6 +36,9 @@ class VideoRenderer:
             resolution: Video resolution as (width, height)
             template_path: Path to the template data pickle file
             topology_path: Path to the topology OBJ file
+            apply_transform: Whether to apply coordinate transformation
+            zoom_factor: Zoom factor for field of view (>1.0 = zoom in, <1.0 = zoom out)
+            camera_distance: Distance of camera from object (negative values = closer)
         """
         self.fps = fps
         self.resolution = resolution
