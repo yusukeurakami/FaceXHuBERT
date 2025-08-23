@@ -60,6 +60,10 @@ def auto_configure_args(args):
         args.vertice_dim = config['vertice_dim']
     if not hasattr(args, 'output_fps') or args.output_fps is None:
         args.output_fps = config['fps']
+
+    # Also set fps parameter if it's None (for predict.py compatibility)
+    if hasattr(args, 'fps') and args.fps is None:
+        args.fps = config['fps']
     if not hasattr(args, 'train_subjects') or not args.train_subjects:
         args.train_subjects = config['default_subjects']
     if not hasattr(args, 'val_subjects') or not args.val_subjects:

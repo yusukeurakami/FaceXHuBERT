@@ -8,6 +8,7 @@ import ffmpeg
 import numpy as np
 import pyrender
 import trimesh
+from tqdm import tqdm
 
 from gt_renderer import transform_gt_to_template_space  # NOQA: F401
 
@@ -166,10 +167,11 @@ class VideoRenderer:
             seq_transformed = seq
 
         # Initialize video writer
+        print(f"Initializing video writer for {output_video_path}")
         video = cv2.VideoWriter(output_video_path, self.fourcc, self.fps, self.resolution)
 
         # Render each frame
-        for f in range(seq.shape[0]):
+        for f in tqdm(range(seq.shape[0]), desc="Rendering frames"):
             ref_mesh.vertices = seq_transformed[f, :, :]
             py_mesh = pyrender.Mesh.from_trimesh(ref_mesh)
             scene = pyrender.Scene()
@@ -186,15 +188,26 @@ class VideoRenderer:
             video.write(frame)
 
         video.release()
+        print(f"Video writer released for {output_video_path}")
+
+        # Verify file was created
+        if os.path.exists(output_video_path):
+            file_size = os.path.getsize(output_video_path)
+            print(f"Video file created successfully: {output_video_path} (Size: {file_size} bytes)")
+        else:
+            print(f"ERROR: Video file was not created: {output_video_path}")
 
         # Add audio if provided
         if audio_path and output_with_audio_path:
+            print(f"Adding audio to video for {output_with_audio_path}")
             try:
+                # Use ffmpeg to combine video and audio
                 input_video = ffmpeg.input(output_video_path)
                 input_audio = ffmpeg.input(audio_path)
                 ffmpeg.concat(input_video, input_audio, v=1, a=1).output(output_with_audio_path).run(
                     overwrite_output=True
                 )
+                print(f"Audio added successfully to {output_with_audio_path}")
             except Exception as e:
                 print(f"Warning: Could not add audio to video. Error: {e}")
 
@@ -236,7 +249,6 @@ class VideoRenderer:
         video_wA_path = os.path.join(video_wA_folder, f"{output_name}.mp4") if audio_path else None
 
         print(f"Rendering video for: {output_name}")
-
         self.render_sequence_to_video(
             prediction_path=prediction_path,
             subject=subject,
