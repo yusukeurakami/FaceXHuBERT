@@ -277,7 +277,7 @@ def create_video_from_prediction(
         fps: Frame rate for video
         dataset_type: Dataset type ("BIWI" or "VOCASET")
     """
-    renderer = VideoRenderer(fps=fps, dataset_type=dataset_type)
+    renderer = VideoRenderer(fps=fps, dataset_type=dataset_type, apply_transform=True)
     try:
         renderer.render_prediction_with_naming(
             prediction_path=prediction_path,

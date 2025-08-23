@@ -122,9 +122,14 @@ class FaceXHuBERT(nn.Module):
         hidden_states = audio
         hidden_states = self.audio_encoder(hidden_states).last_hidden_state
 
-        if hidden_states.shape[1] % 2 != 0:
-            hidden_states = hidden_states[:, : hidden_states.shape[1] - 1]
-        hidden_states = torch.reshape(hidden_states, (1, hidden_states.shape[1] // 2, hidden_states.shape[2] * 2))
+        # Apply the same audio processing logic as in forward() based on FPS ratio
+        if self.i_fps % self.o_fps == 0:
+            # Factor-based adjustment (like BIWI: 50->25) - concatenate features
+            if hidden_states.shape[1] % 2 != 0:
+                hidden_states = hidden_states[:, : hidden_states.shape[1] - 1]
+            hidden_states = torch.reshape(hidden_states, (1, hidden_states.shape[1] // 2, hidden_states.shape[2] * 2))
+        # For interpolation-based adjustment (like VOCASET: 50->60), keep features as-is
+
         h0 = torch.zeros(self.gru_layer_dim, hidden_states.shape[0], self.gru_hidden_dim).requires_grad_().cuda()
 
         vertice_out, _ = self.gru(hidden_states, h0)

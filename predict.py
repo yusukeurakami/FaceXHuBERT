@@ -37,6 +37,20 @@ def test_model(args):
                 else:
                     flattened_templates[subject] = template
             templates = flattened_templates
+
+            # For VOCASET, handle _TA suffix in template keys
+            if args.dataset_type == "VOCASET":
+                # Create mappings for subjects without _TA suffix
+                vocaset_templates = {}
+                for key, template in templates.items():
+                    if key.endswith('_TA'):
+                        # Map both with and without _TA suffix
+                        base_key = key[:-3]  # Remove _TA
+                        vocaset_templates[base_key] = template
+                        vocaset_templates[key] = template
+                    else:
+                        vocaset_templates[key] = template
+                templates = vocaset_templates
     elif config['template_type'] == 'ply':
         import trimesh
 
@@ -159,10 +173,10 @@ def main():
     )
     args = parser.parse_args()
 
-    # Auto-configure arguments based on dataset choice
-    args = auto_configure_args(args)
     # Add dataset attribute for backward compatibility
     args.dataset = args.dataset_type
+    # Auto-configure arguments based on dataset choice
+    args = auto_configure_args(args)
 
     test_model(args)
     render(args)

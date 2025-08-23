@@ -67,6 +67,12 @@ def auto_configure_args(args):
     if not hasattr(args, 'test_subjects') or not args.test_subjects:
         args.test_subjects = config['default_subjects']
 
+    # Auto-configure condition parameter for prediction
+    if hasattr(args, 'condition') and args.condition == "M3":  # Default BIWI value
+        # Set to first VOCASET subject if using VOCASET
+        if args.dataset == "VOCASET":
+            args.condition = config['default_subjects'].split()[0]  # First subject
+
     return args
 
 
