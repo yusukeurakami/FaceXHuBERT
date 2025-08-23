@@ -51,7 +51,7 @@ class VideoRenderer:
 
         # Auto-configure paths based on dataset type if not explicitly provided
         if template_path == "BIWI/templates_scaled.pkl" and dataset_type == "VOCASET":
-            template_path = "VOCASET/templates/FLAME_sample.ply"
+            template_path = "VOCASET/templates/templates.pkl"
             topology_path = "VOCASET/templates/FLAME_sample.ply"
 
         # Load templates and topology based on dataset type
@@ -82,25 +82,18 @@ class VideoRenderer:
                         self.template_data[subject] = template
             self.topology_mesh = trimesh.load_mesh(topology_path, process=False)
         elif self.dataset_type == "VOCASET":
-            if template_path.endswith('.ply'):
-                # Load PLY template (vertices + faces)
-                mesh = trimesh.load_mesh(template_path, process=False)
-                # Create template for all subjects (use same template for all)
-                self.template_data = {"default": mesh.vertices.flatten()}
-                self.topology_mesh = mesh
-            else:
-                # Load pickle templates like BIWI
-                with open(template_path, 'rb') as f:
-                    templates = pkl.load(f, encoding='latin1')
-                    # Ensure templates are flattened
-                    self.template_data = {}
-                    for subject, template in templates.items():
-                        if len(template.shape) > 1:
-                            self.template_data[subject] = template.flatten()
-                        else:
-                            self.template_data[subject] = template
-                # Load topology mesh separately
-                self.topology_mesh = trimesh.load_mesh(topology_path, process=False)
+            # Load pickle templates like BIWI
+            with open(template_path, 'rb') as f:
+                templates = pkl.load(f, encoding='latin1')
+                # Ensure templates are flattened
+                self.template_data = {}
+                for subject, template in templates.items():
+                    if len(template.shape) > 1:
+                        self.template_data[subject] = template.flatten()
+                    else:
+                        self.template_data[subject] = template
+            # Load topology mesh separately
+            self.topology_mesh = trimesh.load_mesh(topology_path, process=False)
         else:
             raise ValueError(f"Unsupported dataset type: {self.dataset_type}")
 
@@ -154,12 +147,18 @@ class VideoRenderer:
         else:
             raise ValueError(f"Unsupported dataset type: {self.dataset_type}")
 
-        # Create reference mesh using template vertices and topology faces
+        # # Create reference mesh using template vertices and topology faces
+        # ref_mesh = trimesh.Trimesh(vertices=template_vertices, faces=self.topology_mesh.faces)
+        # self.template_vertices = ref_mesh.vertices
+
         ref_mesh = trimesh.Trimesh(vertices=template_vertices, faces=self.topology_mesh.faces)
+        if self.dataset_type == "VOCASET":
+            ref_mesh.vertices = transform_gt_to_template_space(ref_mesh.vertices, self.topology_mesh.vertices)
         self.template_vertices = ref_mesh.vertices
 
         # Transform sequence to template space (only if needed)
-        if self.apply_transform:
+        # TODO: Voca needs True, BIWI needs False
+        if True:  # self.apply_transform:
             seq_transformed = np.zeros_like(seq)
             for f in range(seq.shape[0]):
                 seq_transformed[f] = transform_gt_to_template_space(seq[f], self.template_vertices)

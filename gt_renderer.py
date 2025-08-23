@@ -7,6 +7,7 @@ import ffmpeg
 import numpy as np
 import pyrender
 import trimesh
+from tqdm import tqdm
 
 
 # Transform GT data to match template coordinate system
@@ -163,6 +164,7 @@ def main(
     template_vertices = render_mesh.vertices
 
     # Apply coordinate transformation to GT sequence
+    # Both BIWI and VOCASET need this transformation
     gt_seq_transformed = np.zeros_like(gt_seq)
     for f in range(gt_seq.shape[0]):
         gt_seq_transformed[f] = transform_gt_to_template_space(gt_seq[f], template_vertices)
@@ -170,7 +172,7 @@ def main(
     render_mesh.vertices = gt_seq_transformed[0, :, :]
     py_mesh = pyrender.Mesh.from_trimesh(render_mesh)
 
-    for f in range(gt_seq.shape[0]):
+    for f in tqdm(range(gt_seq.shape[0]), desc="Rendering frames"):
         render_mesh.vertices = gt_seq_transformed[f, :, :]
         py_mesh = pyrender.Mesh.from_trimesh(render_mesh)
         scene = pyrender.Scene()

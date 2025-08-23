@@ -11,6 +11,7 @@ from tqdm import tqdm
 from transformers import Wav2Vec2Processor
 
 from dataset_config import get_dataset_config, get_emotion_label, parse_filename
+from gt_renderer import transform_gt_to_template_space
 
 
 class Dataset(data.Dataset):
@@ -98,6 +99,12 @@ def load_templates(args):
         raise ValueError(f"Unsupported template type: {config['template_type']}")
 
 
+def load_topology(args):
+    config = get_dataset_config(args.dataset)
+    topology_file = os.path.join(args.dataset, config['topology_file'])
+    return trimesh.load_mesh(topology_file, process=False)
+
+
 def read_data(args):
     print(f"Loading {args.dataset} data...")
     config = get_dataset_config(args.dataset)
@@ -113,6 +120,7 @@ def read_data(args):
 
     # Load templates using the new function
     templates = load_templates(args)
+    topology = load_topology(args)
 
     for r, ds, fs in os.walk(audio_path):
         for f in tqdm(fs, desc=f"Processing {args.dataset} audio files"):
@@ -137,6 +145,7 @@ def read_data(args):
                 if subject_id in templates:
                     temp = templates[subject_id]
                 else:
+                    # print(f"Loaded template for {subject_id} from {templates.keys()} in {args.dataset}")
                     # For VOCASET, try with _TA suffix
                     subject_with_ta = subject_id + "_TA"
                     if subject_with_ta in templates:
@@ -148,6 +157,11 @@ def read_data(args):
                             f"Warning: Template not found for subject {subject_id} (tried {subject_with_ta}), skipping {f}"
                         )
                         continue
+                if args.dataset == "VOCASET":
+                    # flip the template for VOCASET
+                    temp = temp.reshape(-1, 3)
+                    temp = transform_gt_to_template_space(temp, topology.vertices)
+                    temp = temp.flatten()
 
                 data[key]["name"] = f
                 data[key]["template"] = temp.reshape((-1))
