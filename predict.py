@@ -124,6 +124,8 @@ def render(args):
         audio_path=wav_path,
         fps=args.fps,
         dataset_type=args.dataset_type,
+        zoom_factor=args.zoom_factor,
+        camera_distance=args.camera_distance,
     )
 
 
@@ -170,6 +172,12 @@ def main():
         type=int,
         default="1",
         help='style control for emotion, 1 for expressive animation, 0 for neutral animation',
+    )
+    parser.add_argument(
+        "--zoom_factor", type=float, default=1.0, help='zoom factor for field of view (>1.0 = zoom in, <1.0 = zoom out)'
+    )
+    parser.add_argument(
+        "--camera_distance", type=float, default=-1.6, help='distance of camera from object (negative values = closer)'
     )
     args = parser.parse_args()
 

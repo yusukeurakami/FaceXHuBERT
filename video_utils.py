@@ -274,6 +274,8 @@ def create_video_from_prediction(
     audio_path: Optional[str] = None,
     fps: float = 25.0,
     dataset_type: str = "BIWI",
+    zoom_factor: float = 1.0,
+    camera_distance: float = -1.6,
 ):
     """
     Convenience function to create a video from a prediction file.
@@ -288,8 +290,16 @@ def create_video_from_prediction(
         audio_path: Optional audio file path
         fps: Frame rate for video
         dataset_type: Dataset type ("BIWI" or "VOCASET")
+        zoom_factor: Zoom factor for field of view (>1.0 = zoom in, <1.0 = zoom out)
+        camera_distance: Distance of camera from object (negative values = closer)
     """
-    renderer = VideoRenderer(fps=fps, dataset_type=dataset_type, apply_transform=True)
+    renderer = VideoRenderer(
+        fps=fps,
+        dataset_type=dataset_type,
+        apply_transform=True,
+        zoom_factor=zoom_factor,
+        camera_distance=camera_distance,
+    )
     try:
         renderer.render_prediction_with_naming(
             prediction_path=prediction_path,

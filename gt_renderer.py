@@ -96,17 +96,18 @@ def main(
         )
 
     elif dataset_type == "VOCASET":
+        subject_id = "FaceTalk_170725_00137_TA"
         if gt_folder is None:
             gt_folder = "./VOCASET/vertices_npy/"
         if audio_folder is None:
             audio_folder = "./VOCASET/wav/"
         if gt_seq_name is None:
-            gt_seq_name = "FaceTalk_170725_00137_TA_sentence01.npy"
+            gt_seq_name = f"{subject_id}_sentence01.npy"
         if audio_name is None:
-            audio_name = "FaceTalk_170725_00137_TA_sentence01.wav"
+            audio_name = f"{subject_id}_sentence01.wav"
         vertice_dim = 15069  # 5023 vertices * 3
         template_path = "./VOCASET/templates/FLAME_sample.ply"
-        template_data_path = None  # VOCASET uses direct PLY template
+        template_data_path = "./VOCASET/templates/templates.pkl"  # VOCASET uses direct PLY template
         fps = 60
         # Apply zoom factor to field of view (smaller FOV = zoomed in)
         base_fov = np.pi / 3.0
@@ -154,6 +155,10 @@ def main(
     elif dataset_type == "VOCASET":
         # Load FLAME template directly
         render_mesh = trimesh.load_mesh(template_path, process=False)
+
+        with open(template_data_path, "rb") as f:
+            template_data = pkl.load(f, encoding="latin1")
+        render_mesh = trimesh.Trimesh(vertices=template_data[subject_id], faces=render_mesh.faces)
 
     template_vertices = render_mesh.vertices
 
