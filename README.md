@@ -53,9 +53,12 @@ Download the pretrained model from [FaceXHuBERT model](https://mega.nz/file/L4Bz
 
 - Given a raw audio file (wav_path), animate the mesh and render the video by running the following command: 
 	```
-	python predict.py --subject F1 --condition F3 --wav_path "demo/wav/test.wav" --emotion 1
+	python predict.py --model_name FaceXHuBERT_BIWI --dataset_type BIWI --subject F1 --condition F3 --wav_path "demo/wav/test.wav" --emotion 1
 	```
 	
+	```
+	python predict.py --model_name FaceXHuBERT_VOCASET --dataset_type VOCASET --subject FaceTalk_170725_00137 --zoom_factor 3
+	```
 	The predict.py will run and generate the rendered videos in the `demo/render/video_with_audio/` folder. The prediction data will be saved in `demo/result/` folder. Try playing with your own audio file (in .wav format), other subjects and conditions (i.e. F1, F2, F3, F4, F5, F6, F7, F8, M1, M2, M3, M4, M5, M6). 
  
 ## Data
@@ -122,3 +125,7 @@ We would like to thank the authors of FaceFormer for making their code available
 
 ## License
 This repository is released under [CC-BY-NC-4.0-International License](https://github.com/Gibberlings3/GitHub-Templates/blob/master/License-Templates/CC-BY-NC-4.0/LICENSE-CC-BY-NC-4.0.md)
+
+
+## Episode
+### Reproducing the XHuBERT results

@@ -42,6 +42,7 @@ def trainer(args, train_loader, dev_loader, model, optimizer, criterion, epoch=1
         optimizer.zero_grad()
 
         for i, (audio, vertice, template, one_hot, file_name, emo_one_hot) in pbar:
+            print(f"name: {file_name}")
             iteration += 1
             vertice = str(vertice[0])
             vertice = np.load(vertice, allow_pickle=True)
@@ -256,6 +257,7 @@ def test(args, model, test_loader, epoch):
                 audio_path=audio_file_path if os.path.exists(audio_file_path) else None,
                 fps=args.output_fps,
                 dataset_type=args.dataset,
+                zoom_factor=args.zoom_factor,
             )
             print(f"Video created for {prediction_filename}")
         except Exception as e:

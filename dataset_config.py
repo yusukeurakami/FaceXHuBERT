@@ -23,6 +23,7 @@ DATASET_CONFIGS = {
         },
         'emotion_threshold': 40,
         'patterns': {'subject': r'([FM]\d+)_.*', 'sentence': r'.*_(\w\d+)\..*'},
+        'zoom_factor': 1.0,
     },
     'VOCASET': {
         'vertice_dim': 15069,
@@ -40,6 +41,7 @@ DATASET_CONFIGS = {
         },
         'emotion_threshold': None,  # No emotion distinction
         'patterns': {'subject': r'(FaceTalk_\d+_\d+)_TA_.*', 'sentence': r'.*_sentence(\d+)\..*'},
+        'zoom_factor': 3.0,
     },
 }
 
