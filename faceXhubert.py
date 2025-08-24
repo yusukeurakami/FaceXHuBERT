@@ -1,4 +1,4 @@
-from typing import Any, Callable
+from typing import Any, Callable, Tuple
 
 import torch
 import torch.nn as nn
@@ -10,7 +10,7 @@ from hubert.modeling_hubert import HubertModel
 
 def inputRepresentationAdjustment(
     audio_embedding_matrix: torch.Tensor, vertex_matrix: torch.Tensor, ifps: int, ofps: int
-) -> tuple[torch.Tensor, torch.Tensor, int]:
+) -> Tuple[torch.Tensor, torch.Tensor, int]:
     """Adjusts audio embeddings and vertex matrices to align frame rates for facial animation synthesis.
 
     This function handles temporal alignment between audio features and facial vertex data when

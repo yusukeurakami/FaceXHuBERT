@@ -103,9 +103,9 @@ def main(
         if audio_folder is None:
             audio_folder = "./VOCASET/wav/"
         if gt_seq_name is None:
-            gt_seq_name = f"{subject_id}_sentence01.npy"
+            gt_seq_name = f"{subject_id}_sentence03.npy"
         if audio_name is None:
-            audio_name = f"{subject_id}_sentence01.wav"
+            audio_name = f"{subject_id}_sentence03.wav"
         vertice_dim = 15069  # 5023 vertices * 3
         template_path = "./VOCASET/templates/FLAME_sample.ply"
         template_data_path = "./VOCASET/templates/templates.pkl"  # VOCASET uses direct PLY template
