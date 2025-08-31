@@ -258,6 +258,7 @@ def test(args, model, test_loader, epoch):
                 fps=args.output_fps,
                 dataset_type=args.dataset,
                 zoom_factor=args.zoom_factor,
+                camera_distance=args.camera_distance,
             )
             print(f"Video created for {prediction_filename}")
         except Exception as e:
@@ -310,6 +311,12 @@ def main():
         type=int,
         default=None,
         help='fps of the visual data (auto-set based on dataset if not specified)',
+    )
+    parser.add_argument(
+        "--zoom_factor", type=float, default=1.0, help='zoom factor for field of view (>1.0 = zoom in, <1.0 = zoom out)'
+    )
+    parser.add_argument(
+        "--camera_distance", type=float, default=-1.6, help='distance of camera from object (negative values = closer)'
     )
     args = parser.parse_args()
 

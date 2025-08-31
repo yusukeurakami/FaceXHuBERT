@@ -79,6 +79,10 @@ def auto_configure_args(args):
         if args.dataset == "VOCASET":
             args.condition = config['default_subjects'].split()[0]  # First subject
 
+    # Auto-configure zoom_factor based on dataset if not explicitly set
+    if not hasattr(args, 'zoom_factor') or args.zoom_factor == 1.0:  # Default value
+        args.zoom_factor = config['zoom_factor']
+
     return args
 
 
