@@ -147,18 +147,14 @@ class VideoRenderer:
         else:
             raise ValueError(f"Unsupported dataset type: {self.dataset_type}")
 
-        # # Create reference mesh using template vertices and topology faces
-        # ref_mesh = trimesh.Trimesh(vertices=template_vertices, faces=self.topology_mesh.faces)
-        # self.template_vertices = ref_mesh.vertices
-
         ref_mesh = trimesh.Trimesh(vertices=template_vertices, faces=self.topology_mesh.faces)
         if self.dataset_type == "VOCASET":
             ref_mesh.vertices = transform_gt_to_template_space(ref_mesh.vertices, self.topology_mesh.vertices)
         self.template_vertices = ref_mesh.vertices
 
         # Transform sequence to template space (only if needed)
-        # TODO: Voca needs True, BIWI needs False
-        if True:  # self.apply_transform:
+        # TODO: Voca gt needs True, Voca pred needs False, BIWI gt needs True
+        if self.apply_transform:
             seq_transformed = np.zeros_like(seq)
             for f in range(seq.shape[0]):
                 seq_transformed[f] = transform_gt_to_template_space(seq[f], self.template_vertices)
@@ -275,6 +271,7 @@ def create_video_from_prediction(
     dataset_type: str = "BIWI",
     zoom_factor: float = 1.0,
     camera_distance: float = -1.6,
+    apply_transform: bool = True,
 ):
     """
     Convenience function to create a video from a prediction file.
@@ -295,7 +292,7 @@ def create_video_from_prediction(
     renderer = VideoRenderer(
         fps=fps,
         dataset_type=dataset_type,
-        apply_transform=True,
+        apply_transform=apply_transform,
         zoom_factor=zoom_factor,
         camera_distance=camera_distance,
     )

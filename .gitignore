@@ -5,6 +5,7 @@ BIWI/templates/*.obj
 BIWI/templates/*.pkl
 VOCASET/
 pretrained_model/
+Evaluation/renders/
 
 __pycache__/
 

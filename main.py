@@ -245,6 +245,12 @@ def test(args, model, test_loader, epoch):
                 prediction_path = os.path.join(result_path, prediction_filename)
                 np.save(prediction_path, prediction.detach().cpu().numpy())
 
+        # TODO: Voca pred needs False, BIWI needs False
+        if args.dataset == "VOCASET":
+            apply_transform = False
+        else:
+            apply_transform = True
+
         # Create video
         try:
             create_video_from_prediction(
@@ -259,6 +265,7 @@ def test(args, model, test_loader, epoch):
                 dataset_type=args.dataset,
                 zoom_factor=args.zoom_factor,
                 camera_distance=args.camera_distance,
+                apply_transform=apply_transform,
             )
             print(f"Video created for {prediction_filename}")
         except Exception as e:

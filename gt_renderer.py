@@ -154,12 +154,14 @@ def main(
         render_mesh = trimesh.Trimesh(vertices=template_data[subject_id], faces=topology_mesh.faces)
 
     elif dataset_type == "VOCASET":
-        # Load FLAME template directly
+        # # Load FLAME template directly
         render_mesh = trimesh.load_mesh(template_path, process=False)
 
         with open(template_data_path, "rb") as f:
             template_data = pkl.load(f, encoding="latin1")
         render_mesh = trimesh.Trimesh(vertices=template_data[subject_id], faces=render_mesh.faces)
+        # render_mesh = trimesh.load_mesh("./VOCASET/templates/yusuke_01/yusuke_01_obj_fit.obj", process=False)
+        # render_mesh = trimesh.load_mesh("./VOCASET/templates/yusuke_01/yusuke_01_color_test.ply", process=False)
 
     template_vertices = render_mesh.vertices
 
@@ -169,11 +171,11 @@ def main(
     for f in range(gt_seq.shape[0]):
         gt_seq_transformed[f] = transform_gt_to_template_space(gt_seq[f], template_vertices)
 
-    render_mesh.vertices = gt_seq_transformed[0, :, :]
+    # render_mesh.vertices = gt_seq_transformed[0, :, :]
     py_mesh = pyrender.Mesh.from_trimesh(render_mesh)
 
     for f in tqdm(range(gt_seq.shape[0]), desc="Rendering frames"):
-        render_mesh.vertices = gt_seq_transformed[f, :, :]
+        # render_mesh.vertices = gt_seq_transformed[f, :, :]
         py_mesh = pyrender.Mesh.from_trimesh(render_mesh)
         scene = pyrender.Scene()
         scene.add(py_mesh)
