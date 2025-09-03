@@ -6,11 +6,18 @@ import time
 import librosa
 import numpy as np
 import torch
+import trimesh
 from transformers import Wav2Vec2Processor
 
 from dataset_config import auto_configure_args, get_dataset_config
 from faceXhubert import FaceXHuBERT
-from video_utils import create_video_from_prediction
+from video_utils import create_video_from_prediction, transform_gt_to_template_space
+
+
+def load_topology(args):
+    config = get_dataset_config(args.dataset)
+    topology_file = os.path.join(args.dataset, config['topology_file'])
+    return trimesh.load_mesh(topology_file, process=False)
 
 
 def test_model(args):
@@ -40,9 +47,17 @@ def test_model(args):
 
             # For VOCASET, handle _TA suffix in template keys
             if args.dataset_type == "VOCASET":
+                topology = load_topology(args)
                 # Create mappings for subjects without _TA suffix
                 vocaset_templates = {}
                 for key, template in templates.items():
+
+                    # 20250903
+                    # flip the template for VOCASET
+                    template = template.reshape(-1, 3)
+                    template = transform_gt_to_template_space(template, topology.vertices)
+                    template = template.flatten()
+
                     if key.endswith('_TA'):
                         # Map both with and without _TA suffix
                         base_key = key[:-3]  # Remove _TA
@@ -57,7 +72,7 @@ def test_model(args):
         mesh = trimesh.load_mesh(template_file)
         # Create template for the subject (try both with and without _TA suffix)
         templates = {args.subject: mesh.vertices.flatten()}
-        templates[args.subject + "_TA"] = mesh.vertices.flatten()
+        templates[args.subject] = mesh.vertices.flatten()
     else:
         raise ValueError(f"Unsupported template type: {config['template_type']}")
 
@@ -126,6 +141,7 @@ def render(args):
         dataset_type=args.dataset_type,
         zoom_factor=args.zoom_factor,
         camera_distance=args.camera_distance,
+        apply_transform=False,
     )
 
 
