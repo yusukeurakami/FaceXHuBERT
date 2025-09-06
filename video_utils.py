@@ -165,6 +165,11 @@ class VideoRenderer:
         print(f"Initializing video writer for {output_video_path}")
         video = cv2.VideoWriter(output_video_path, self.fourcc, self.fps, self.resolution)
 
+        # Measure rendering time for inference frequency calculation
+        import time
+
+        start_time = time.time()
+
         # Render each frame
         for f in tqdm(range(seq.shape[0]), desc="Rendering frames"):
             ref_mesh.vertices = seq_transformed[f, :, :]
@@ -181,6 +186,15 @@ class VideoRenderer:
             cv2.imwrite(output_frame, color)
             frame = cv2.imread(output_frame)
             video.write(frame)
+
+        end_time = time.time()
+        elapsed = end_time - start_time
+        num_frames = seq.shape[0]
+        if elapsed > 0:
+            inference_frequency = num_frames / elapsed
+        else:
+            inference_frequency = 0.0
+        print(f"Video rendering frequency: {inference_frequency:.2f} Hz")
 
         video.release()
         print(f"Video writer released for {output_video_path}")

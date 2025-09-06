@@ -28,6 +28,30 @@ def test_model(args):
     model.load_state_dict(torch.load('pretrained_model/{}.pth'.format(args.model_name)))
     model = model.to(torch.device(args.device))
     model.eval()
+    print("Model architecture:\n", model)
+    print("Model loaded from: pretrained_model/{}.pth".format(args.model_name))
+    print("Model device:", args.device)
+
+    # Print parameter size and memory consumption for major modules
+    def sizeof_fmt(num, suffix='B'):
+        for unit in ['', 'K', 'M', 'G', 'T', 'P', 'E', 'Z']:
+            if abs(num) < 1024.0:
+                return "%3.1f%s%s" % (num, unit, suffix)
+            num /= 1024.0
+        return "%.1f%s%s" % (num, 'Y', suffix)
+
+    total_params = 0
+    print("\nParameter size and memory consumption by major modules:")
+    for name, module in model.named_children():
+        module_params = sum(p.numel() for p in module.parameters())
+        module_bytes = sum(p.numel() * p.element_size() for p in module.parameters())
+        total_params += module_params
+        print(f"  {name}: {module_params:,} params, {sizeof_fmt(module_bytes)}")
+
+    # Print total
+    total_bytes = sum(p.numel() * p.element_size() for p in model.parameters())
+    print(f"\nTotal parameters: {total_params:,}")
+    print(f"Total memory (parameters): {sizeof_fmt(total_bytes)}")
 
     # Load templates based on dataset type
     config = get_dataset_config(args.dataset_type)
@@ -98,6 +122,9 @@ def test_model(args):
     template = np.reshape(template, (-1, template.shape[0]))
     template = torch.FloatTensor(template).to(device=args.device)
 
+    # Check CUDA memory before HuBERT loading
+    if torch.cuda.is_available():
+        print(f"CUDA memory before HuBERT: {torch.cuda.memory_allocated() / 1024**2:.1f} MB")
     wav_path = args.wav_path
     test_name = os.path.basename(wav_path).split(".")[0]
     start_time = time.time()
@@ -109,12 +136,51 @@ def test_model(args):
     audio_feature = np.reshape(audio_feature, (-1, audio_feature.shape[0]))
     audio_feature = torch.FloatTensor(audio_feature).to(device=args.device)
 
-    prediction = model.predict(audio_feature, template, one_hot, emo_one_hot)
-    prediction = prediction.squeeze()
+    # After HuBERT loading (around line 135), add:
+    if torch.cuda.is_available():
+        print(f"CUDA memory after HuBERT: {torch.cuda.memory_allocated() / 1024**2:.1f} MB")
+        print(f"CUDA reserved: {torch.cuda.memory_reserved() / 1024**2:.1f} MB")
+
+    # Debug input data sizes
+    print("\nInput data sizes:")
+    print(
+        f"speech_array shape: {speech_array.shape}, dtype: {speech_array.dtype}, size: {speech_array.nbytes / 1024**2:.2f} MB"
+    )
+    print(f"audio_feature shape: {audio_feature.shape}, dtype: {audio_feature.dtype}")
+    print(f"audio_feature size: {audio_feature.numel() * audio_feature.element_size() / 1024**2:.2f} MB")
+    print(f"template shape: {template.shape}, dtype: {template.dtype}")
+    print(f"template size: {template.numel() * template.element_size() / 1024**2:.2f} MB")
+    print(f"one_hot shape: {one_hot.shape}, dtype: {one_hot.dtype}")
+    print(f"one_hot size: {one_hot.numel() * one_hot.element_size() / 1024**2:.2f} MB")
+    print(f"emo_one_hot shape: {emo_one_hot.shape}, dtype: {emo_one_hot.dtype}")
+    print(f"emo_one_hot size: {emo_one_hot.numel() * emo_one_hot.element_size() / 1024**2:.2f} MB")
+
+    # Check total input data size
+    total_input_size = (
+        audio_feature.numel() * audio_feature.element_size()
+        + template.numel() * template.element_size()
+        + one_hot.numel() * one_hot.element_size()
+        + emo_one_hot.numel() * emo_one_hot.element_size()
+    ) / 1024**2
+    print(f"Total input data size: {total_input_size:.2f} MB")
+
+    with torch.no_grad():
+        print(f"CUDA memory before prediction: {torch.cuda.memory_allocated() / 1024**2:.1f} MB")
+        prediction = model.predict(audio_feature, template, one_hot, emo_one_hot)
+        print(f"CUDA memory after prediction: {torch.cuda.memory_allocated() / 1024**2:.1f} MB")
+        prediction = prediction.squeeze()
+        print(f"CUDA memory after squeeze: {torch.cuda.memory_allocated() / 1024**2:.1f} MB")
+        print(f"Prediction shape: {prediction.shape}, dtype: {prediction.dtype}")
+        print(f"Prediction size: {prediction.numel() * prediction.element_size() / 1024**2:.2f} MB")
+
     elapsed = time.time() - start_time
+    if torch.cuda.is_available():
+        print(f"CUDA memory after prediction: {torch.cuda.memory_allocated() / 1024**2:.1f} MB")
+        print(f"CUDA reserved: {torch.cuda.memory_reserved() / 1024**2:.1f} MB")
     print("Inference time for ", prediction.shape[0], " frames is: ", elapsed, " seconds.")
     print("Inference time for 1 frame is: ", elapsed / prediction.shape[0], " seconds.")
     print("Inference time for 1 second of audio is: ", ((elapsed * 25) / prediction.shape[0]), " seconds.")
+    print("Inference frequency: {:.2f} Hz".format(prediction.shape[0] / elapsed if elapsed > 0 else 0))
     out_file_name = test_name + "_" + emo_label + "_" + args.subject + "_Condition_" + args.condition
     np.save(os.path.join(args.result_path, out_file_name), prediction.detach().cpu().numpy())
 
