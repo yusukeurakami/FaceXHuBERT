@@ -86,22 +86,27 @@ for gt_seq in gt_seqs:
 
             # ms = pmlab.MeshSet()
             # ms.load_new_mesh(subject_template_path)
-            # template_mesh= ms.current_mesh()
+            # template_mesh = ms.current_mesh()
 
-            # gt_mesh = pmlab.Mesh(gt_seq[f,:,:], template_mesh.face_matrix(), template_mesh.vertex_normal_matrix())
+            # gt_mesh = pmlab.Mesh(gt_seq[f, :, :], template_mesh.face_matrix(), template_mesh.vertex_normal_matrix())
             # ms.add_mesh(gt_mesh)
-            #           #   print(ms.current_mesh_id())
+            # #   print(ms.current_mesh_id())
 
-            # pred_mesh = pmlab.Mesh(pred_seq[f,:,:], template_mesh.face_matrix(), template_mesh.vertex_normal_matrix())
+            # pred_mesh = pmlab.Mesh(pred_seq[f, :, :], template_mesh.face_matrix(), template_mesh.vertex_normal_matrix())
             # ms.add_mesh(pred_mesh)
-            #           #   print(ms.current_mesh_id())
+            # #   print(ms.current_mesh_id())
 
-            # ms.apply_filter('distance_from_reference_mesh', measuremesh=2, refmesh=1, signeddist = False)
+            # ms.apply_filter('distance_from_reference_mesh', measuremesh=2, refmesh=1, signeddist=False)
             # ms.set_current_mesh(2)
             # vertex_quality = ms.current_mesh().vertex_quality_array()
-            # #ms.apply_filter('colorize_by_vertex_quality', minval=ms.current_mesh().vertex_quality_array().min(), maxval=ms.current_mesh().vertex_quality_array().max(),zerosym=True)
-            # ms.apply_filter('quality_mapper_applier', minqualityval=ms.current_mesh().vertex_quality_array().min(), maxqualityval=ms.current_mesh().vertex_quality_array().max(),tfslist= 1)
-            # ms.save_current_mesh( meshes_folder + str(f) +".obj", save_vertex_color=True)
+            # # ms.apply_filter('colorize_by_vertex_quality', minval=ms.current_mesh().vertex_quality_array().min(), maxval=ms.current_mesh().vertex_quality_array().max(),zerosym=True)
+            # ms.apply_filter(
+            #     'quality_mapper_applier',
+            #     minqualityval=ms.current_mesh().vertex_quality_array().min(),
+            #     maxqualityval=ms.current_mesh().vertex_quality_array().max(),
+            #     tfslist=1,
+            # )
+            # ms.save_current_mesh(meshes_folder + str(f) + ".obj", save_vertex_color=True)
             # sequence_mean_face_vertex_error = sequence_mean_face_vertex_error + vertex_quality.mean(axis=None)
             # ms.set_current_mesh(2)
             # ms.delete_current_mesh()

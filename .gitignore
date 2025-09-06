@@ -3,6 +3,9 @@ BIWI/wav
 BIWI/vertices_npy
 BIWI/templates/*.obj
 BIWI/templates/*.pkl
+VOCASET/
+pretrained_model/
+Evaluation/renders/
 
 __pycache__/
 
@@ -14,3 +17,6 @@ facebook/
 *.pth
 *.mp4
 *.jpg
+*.wav
+
+facexhubert.egg-info/

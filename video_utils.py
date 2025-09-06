@@ -147,18 +147,14 @@ class VideoRenderer:
         else:
             raise ValueError(f"Unsupported dataset type: {self.dataset_type}")
 
-        # # Create reference mesh using template vertices and topology faces
-        # ref_mesh = trimesh.Trimesh(vertices=template_vertices, faces=self.topology_mesh.faces)
-        # self.template_vertices = ref_mesh.vertices
-
         ref_mesh = trimesh.Trimesh(vertices=template_vertices, faces=self.topology_mesh.faces)
         if self.dataset_type == "VOCASET":
             ref_mesh.vertices = transform_gt_to_template_space(ref_mesh.vertices, self.topology_mesh.vertices)
         self.template_vertices = ref_mesh.vertices
 
         # Transform sequence to template space (only if needed)
-        # TODO: Voca needs True, BIWI needs False
-        if True:  # self.apply_transform:
+        # TODO: Voca gt needs True, Voca pred needs False, BIWI gt needs True
+        if self.apply_transform:
             seq_transformed = np.zeros_like(seq)
             for f in range(seq.shape[0]):
                 seq_transformed[f] = transform_gt_to_template_space(seq[f], self.template_vertices)
@@ -168,6 +164,11 @@ class VideoRenderer:
         # Initialize video writer
         print(f"Initializing video writer for {output_video_path}")
         video = cv2.VideoWriter(output_video_path, self.fourcc, self.fps, self.resolution)
+
+        # Measure rendering time for inference frequency calculation
+        import time
+
+        start_time = time.time()
 
         # Render each frame
         for f in tqdm(range(seq.shape[0]), desc="Rendering frames"):
@@ -185,6 +186,15 @@ class VideoRenderer:
             cv2.imwrite(output_frame, color)
             frame = cv2.imread(output_frame)
             video.write(frame)
+
+        end_time = time.time()
+        elapsed = end_time - start_time
+        num_frames = seq.shape[0]
+        if elapsed > 0:
+            inference_frequency = num_frames / elapsed
+        else:
+            inference_frequency = 0.0
+        print(f"Video rendering frequency: {inference_frequency:.2f} Hz")
 
         video.release()
         print(f"Video writer released for {output_video_path}")
@@ -275,6 +285,7 @@ def create_video_from_prediction(
     dataset_type: str = "BIWI",
     zoom_factor: float = 1.0,
     camera_distance: float = -1.6,
+    apply_transform: bool = True,
 ):
     """
     Convenience function to create a video from a prediction file.
@@ -295,7 +306,7 @@ def create_video_from_prediction(
     renderer = VideoRenderer(
         fps=fps,
         dataset_type=dataset_type,
-        apply_transform=True,
+        apply_transform=apply_transform,
         zoom_factor=zoom_factor,
         camera_distance=camera_distance,
     )
