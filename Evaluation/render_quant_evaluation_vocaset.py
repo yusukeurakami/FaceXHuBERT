@@ -5,9 +5,9 @@ import pickle as pkl
 import cv2
 import ffmpeg
 import numpy as np
+import pymeshlab as pmlab
 import pyrender
 import trimesh
-
 from gt_renderer import transform_gt_to_template_space
 
 quantfilename = "quantitative_metric.txt"
@@ -44,7 +44,8 @@ with open("../VOCASET/templates/templates.pkl", "rb") as f:
     template_data = pkl.load(f, encoding='latin1')
 
 # Load the FLAME topology from the VOCASET template
-topology_mesh = trimesh.load_mesh("../VOCASET/templates/FLAME_sample.ply", process=False)
+subject_template_path = "../VOCASET/templates/FLAME_sample.ply"
+topology_mesh = trimesh.load_mesh(subject_template_path, process=False)
 
 print("Evaluation started")
 for gt_seq in gt_seqs:
@@ -113,9 +114,44 @@ for gt_seq in gt_seqs:
 
         for f in range(pred_seq.shape[0]):
 
-            # Calculate vertex error using numpy instead of pymeshlab for now
-            vertex_error = np.linalg.norm(gt_seq_transformed[f] - pred_seq_transformed[f], axis=1)
-            sequence_mean_face_vertex_error = sequence_mean_face_vertex_error + np.mean(vertex_error)
+            # Calculate vertex error using pymeshlab
+            ms = pmlab.MeshSet()
+
+            # Create GT mesh
+            gt_mesh = pmlab.Mesh(gt_seq_transformed[f, :, :], topology_mesh.faces)
+            ms.add_mesh(gt_mesh)
+
+            # Create pred mesh
+            pred_mesh = pmlab.Mesh(pred_seq_transformed[f, :, :], topology_mesh.faces)
+            ms.add_mesh(pred_mesh)
+
+            # Set pred mesh as current (mesh 1) and compute distance to GT mesh (mesh 0)
+            ms.set_current_mesh(1)
+            ms.compute_scalar_by_distance_from_another_mesh_per_vertex(refmesh=0)
+
+            # Get the distance values from vertex scalar array
+            current_mesh = ms.current_mesh()
+            if current_mesh.has_vertex_scalar():
+                vertex_distances = current_mesh.vertex_scalar_array()
+                # Take absolute values since distances might be signed
+                vertex_distances = np.abs(vertex_distances)
+
+                # Colorize by distance for visualization
+                ms.compute_color_from_scalar_per_vertex()
+
+                # Save mesh with vertex colors
+                ms.save_current_mesh(meshes_folder + str(f) + ".obj", save_vertex_color=True)
+
+                # Add to sequence error
+                sequence_mean_face_vertex_error = sequence_mean_face_vertex_error + vertex_distances.mean()
+            else:
+                print(f"Warning: No vertex scalar data found for frame {f}")
+                # Fallback to numpy calculation
+                vertex_error = np.linalg.norm(gt_seq_transformed[f] - pred_seq_transformed[f], axis=1)
+                sequence_mean_face_vertex_error = sequence_mean_face_vertex_error + np.mean(vertex_error)
+
+            # Clear meshes for next iteration
+            ms.clear()
 
             render_mesh.vertices = pred_seq_transformed[f, :, :]
             py_mesh = pyrender.Mesh.from_trimesh(render_mesh)
